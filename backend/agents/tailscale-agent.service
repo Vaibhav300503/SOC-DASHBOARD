@@ -1,0 +1,22 @@
+[Unit]
+Description=Tailscale Log Agent for SOC Dashboard
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/tailscale-agent
+ExecStart=/usr/bin/python3 /opt/tailscale-agent/tailscale-agent.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment="BACKEND_URL=http://localhost:3001/api/tailscale/agent"
+Environment="TAILSCALE_LOG_FILE=/var/log/tailscale/tailscaled.log"
+Environment="BATCH_SIZE=10"
+Environment="BATCH_TIMEOUT=5"
+Environment="LOG_LEVEL=INFO"
+
+[Install]
+WantedBy=multi-user.target
