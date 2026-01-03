@@ -3,8 +3,19 @@ import Log from '../models/Log.js'
 import TailscaleLog from '../models/TailscaleLog.js'
 import Event from '../models/Event.js'
 import Agent from '../models/Agent.js'
+import Case from '../models/Case.js'
 
 const router = express.Router()
+
+// Helper function to normalize severity values
+const normalizeSeverity = (severity) => {
+  if (!severity) return 'Low'
+  const s = String(severity).toLowerCase().trim()
+  if (s.includes('critical')) return 'Critical'
+  if (s.includes('high')) return 'High'
+  if (s.includes('medium')) return 'Medium'
+  return 'Low'
+}
 
 /**
  * GET /api/stats/dashboard
@@ -23,8 +34,8 @@ router.get('/dashboard', async (req, res) => {
     const hoursAgo = hoursMap[timeRange] || 24
     const since = new Date(Date.now() - hoursAgo * 60 * 60 * 1000)
 
-    // Get data from Log, Event and Agent collections
-    const [totalLogs, totalEvents, totalAgents] = await Promise.all([
+    // Get data from Log, Event, Case and Agent collections
+    const [totalLogs, totalEvents, totalCases, totalAgents] = await Promise.all([
       Log.countDocuments({
         $or: [
           { timestamp: { $gte: since } },
@@ -34,18 +45,35 @@ router.get('/dashboard', async (req, res) => {
         ]
       }),
       Event.countDocuments({ '@timestamp': { $gte: since } }),
+      Case.countDocuments({ created_at: { $gte: since } }),
       Agent.countDocuments()
     ])
 
     // Severity breakdown from Log collection with normalized fields
-    const severityBreakdown = await Log.aggregate([
+    const logSeverityBreakdown = await Log.aggregate([
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          normSeverity: { $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Unknown'] }
+          rawSeverity: { $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Low'] }
         }
       },
       { $match: { normTimestamp: { $gte: since } } },
+      {
+        $addFields: {
+          lowerSeverity: { $toLower: { $toString: '$rawSeverity' } },
+          normSeverity: {
+            $switch: {
+              branches: [
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'critical'] }, 0] }, then: 'Critical' },
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'high'] }, 0] }, then: 'High' },
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'medium'] }, 0] }, then: 'Medium' },
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'low'] }, 0] }, then: 'Low' }
+              ],
+              default: 'Low'
+            }
+          }
+        }
+      },
       {
         $group: {
           _id: '$normSeverity',
@@ -53,6 +81,35 @@ router.get('/dashboard', async (req, res) => {
         }
       }
     ])
+
+    // Severity breakdown from Cases collection
+    const caseSeverityBreakdown = await Case.aggregate([
+      { $match: { created_at: { $gte: since } } },
+      {
+        $group: {
+          _id: '$severity',
+          count: { $sum: 1 }
+        }
+      }
+    ])
+
+    // Merge and normalize severity breakdowns from both logs and cases
+    const severityMap = new Map()
+    
+    logSeverityBreakdown.forEach(item => {
+      const normalized = normalizeSeverity(item._id)
+      severityMap.set(normalized, (severityMap.get(normalized) || 0) + item.count)
+    })
+    
+    caseSeverityBreakdown.forEach(item => {
+      const normalized = normalizeSeverity(item._id)
+      severityMap.set(normalized, (severityMap.get(normalized) || 0) + item.count)
+    })
+
+    const severityBreakdown = Array.from(severityMap.entries()).map(([severity, count]) => ({
+      _id: severity,
+      count
+    }))
 
     // Event action breakdown from Event collection
     const eventActionBreakdown = await Event.aggregate([
@@ -204,7 +261,8 @@ router.get('/dashboard', async (req, res) => {
     res.json({
       totalLogs,
       totalEvents,
-      total: totalLogs + totalEvents,
+      totalCases,
+      total: totalLogs + totalEvents + totalCases,
       severityBreakdown,
       eventActionBreakdown,
       logTypeBreakdown,
@@ -235,10 +293,25 @@ router.get('/severity', async (req, res) => {
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          normSeverity: { $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Unknown'] }
+          rawSeverity: { $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Low'] }
         }
       },
       { $match: { normTimestamp: { $gte: since } } },
+      {
+        $addFields: {
+          normSeverity: {
+            $switch: {
+              branches: [
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'critical'] }, 0] }, then: 'Critical' },
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'high'] }, 0] }, then: 'High' },
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'medium'] }, 0] }, then: 'Medium' },
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'low'] }, 0] }, then: 'Low' }
+              ],
+              default: 'Low'
+            }
+          }
+        }
+      },
       {
         $group: {
           _id: '$normSeverity',
@@ -247,7 +320,13 @@ router.get('/severity', async (req, res) => {
       }
     ])
 
-    res.json({ data: stats })
+    // Normalize severity values
+    const normalizedStats = stats.map(item => ({
+      _id: normalizeSeverity(item._id),
+      count: item.count
+    }))
+
+    res.json({ data: normalizedStats })
   } catch (error) {
     console.error('Error fetching severity stats:', error)
     res.status(500).json({ error: error.message })
@@ -269,10 +348,25 @@ router.get('/timeline', async (req, res) => {
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          normSeverity: { $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Unknown'] }
+          rawSeverity: { $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Low'] }
         }
       },
       { $match: { normTimestamp: { $gte: since } } },
+      {
+        $addFields: {
+          normSeverity: {
+            $switch: {
+              branches: [
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'critical'] }, 0] }, then: 'Critical' },
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'high'] }, 0] }, then: 'High' },
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'medium'] }, 0] }, then: 'Medium' },
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'low'] }, 0] }, then: 'Low' }
+              ],
+              default: 'Low'
+            }
+          }
+        }
+      },
       {
         $group: {
           _id: {

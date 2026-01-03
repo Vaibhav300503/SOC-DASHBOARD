@@ -158,7 +158,7 @@
         <div class="stat-label">Avg Alerts/IP</div>
       </div>
       <div class="stat-card card-accent-green">
-        <div class="stat-value text-neon-green text-lg truncate">{{ topIP.ip || 'N/A' }}</div>
+        <div class="stat-value text-neon-green text-sm font-mono truncate">{{ topIP.ip || 'N/A' }}</div>
         <div class="stat-label">Most Active IP</div>
       </div>
     </div>
@@ -167,7 +167,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <!-- Left: IP Table -->
       <div class="lg:col-span-2">
-        <IpTable title="Source IP Analysis" :data="apiStore.topSourceIPs" />
+        <IpTable title="Source IP Analysis" :data="apiStore.aggregatedSourceIPs" />
       </div>
 
       <!-- Right: Severity Distribution -->
@@ -196,30 +196,36 @@
     </div>
 
     <!-- Destination IPs -->
-    <IpTable title="Destination IP Analysis" :data="apiStore.topDestinationIPs" />
+    <IpTable title="Destination IP Analysis" :data="apiStore.aggregatedDestinationIPs" />
 
     <!-- IP Trends -->
     <div class="card-glass p-6 rounded-xl border-t border-t-accent-primary/10">
       <h3 class="text-lg font-black title-gradient mb-6">IP Activity Trends</h3>
-      <div class="space-y-4">
-        <div v-for="(ip, idx) in apiStore.topSourceIPs.slice(0, 5)" :key="idx" class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
+      <div v-if="apiStore.aggregatedSourceIPs.length > 0" class="space-y-4">
+        <div v-for="(ip, idx) in apiStore.aggregatedSourceIPs.slice(0, 5)" :key="idx" class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
           <div class="flex items-center justify-between mb-3">
             <div>
               <p class="font-mono text-cyber-400 font-semibold">{{ ip.ip }}</p>
               <p class="text-xs text-slate-dark-400 mt-1">
-                <i class="fas fa-map-marker-alt mr-1"></i>
-                {{ getIPLocation(ip.ip) }}
+                <i class="fas fa-clock mr-1"></i>
+                Last seen: {{ formatTimeAgo(ip.lastSeen) }}
               </p>
             </div>
-            <span :class="['badge-' + getSeverityClass(ip.count)]">
-              {{ getSeverityLabel(ip.count) }}
+            <span :class="['badge-' + getSeverityClass(ip.severity)]">
+              {{ getSeverityLabel(ip.severity) }}
             </span>
           </div>
           <div class="flex items-center justify-between text-xs text-slate-dark-400">
             <span>{{ ip.count }} events</span>
-            <span>Last seen: {{ getLastSeen() }}</span>
+            <span v-if="ip.endpoints.length > 0" class="text-slate-dark-500">
+              {{ ip.endpoints.length }} endpoint{{ ip.endpoints.length > 1 ? 's' : '' }}
+            </span>
           </div>
         </div>
+      </div>
+      <div v-else class="text-center py-12 text-slate-dark-500">
+        <i class="fas fa-inbox text-4xl mb-3 block text-slate-dark-600"></i>
+        <p class="text-sm">No IP activity data available</p>
       </div>
     </div>
   </div>
@@ -229,6 +235,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAPIStore } from '../stores/apiStore'
 import IpTable from '../components/soc/IpTable.vue'
+import { normalizeSeverity } from '../utils/severityNormalization'
 
 const apiStore = useAPIStore()
 const searchIP = ref('')
@@ -258,46 +265,60 @@ const avgAlertsPerIP = computed(() => {
   return (apiStore.logs.length / uniqueIPs.value).toFixed(1)
 })
 
-const topIP = computed(() => apiStore.topSourceIPs[0] || {})
+const topIP = computed(() => apiStore.aggregatedSourceIPs[0] || {})
 
 const severityStats = computed(() => {
-  const criticalCount = apiStore.logs.filter(l => l.severity === 'Critical').length
-  const highCount = apiStore.logs.filter(l => l.severity === 'High').length
-  const mediumCount = apiStore.logs.filter(l => l.severity === 'Medium').length
-  const lowCount = apiStore.logs.filter(l => l.severity === 'Low').length
+  // Use aggregated source IPs to calculate severity distribution
+  const severityCounts = {
+    Critical: 0,
+    High: 0,
+    Medium: 0,
+    Low: 0
+  }
+  
+  apiStore.aggregatedSourceIPs.forEach(ip => {
+    const severity = ip.severity || 'Low'
+    if (severity in severityCounts) {
+      severityCounts[severity] += ip.count
+    }
+  })
   
   return [
-    { name: 'Critical', count: criticalCount, color: '#ff0055' },
-    { name: 'High', count: highCount, color: '#ff6b35' },
-    { name: 'Medium', count: mediumCount, color: '#ffd700' },
-    { name: 'Low', count: lowCount, color: '#00ff88' },
+    { name: 'Critical', count: severityCounts.Critical, color: '#ff0055' },
+    { name: 'High', count: severityCounts.High, color: '#ff6b35' },
+    { name: 'Medium', count: severityCounts.Medium, color: '#ffd700' },
+    { name: 'Low', count: severityCounts.Low, color: '#00ff88' },
   ]
 })
 
-const totalLogs = computed(() => apiStore.logs.length)
+const totalLogs = computed(() => {
+  return apiStore.aggregatedSourceIPs.reduce((sum, ip) => sum + ip.count, 0)
+})
 
-const getSeverityClass = (count) => {
-  if (count > 100) return 'critical'
-  if (count > 50) return 'high'
-  if (count > 20) return 'medium'
-  return 'low'
+const getSeverityClass = (severity) => {
+  const normalized = normalizeSeverity(severity)
+  return normalized.toLowerCase()
 }
 
-const getSeverityLabel = (count) => {
-  if (count > 100) return 'Critical'
-  if (count > 50) return 'High'
-  if (count > 20) return 'Medium'
-  return 'Low'
+const getSeverityLabel = (severity) => {
+  return normalizeSeverity(severity)
 }
 
-const getIPLocation = (ip) => {
-  const locations = ['New York, US', 'Beijing, CN', 'Moscow, RU', 'Mumbai, IN', 'São Paulo, BR']
-  return locations[Math.floor(Math.random() * locations.length)]
-}
-
-const getLastSeen = () => {
-  const times = ['2 min ago', '15 min ago', '1 hour ago', '3 hours ago', '1 day ago']
-  return times[Math.floor(Math.random() * times.length)]
+const formatTimeAgo = (date) => {
+  if (!date) return 'N/A'
+  
+  const now = new Date()
+  const diffMs = now - new Date(date)
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+  
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins} min ago`
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+  
+  return new Date(date).toLocaleDateString()
 }
 
 const handleIPSearch = async () => {

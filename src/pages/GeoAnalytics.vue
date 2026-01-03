@@ -26,50 +26,42 @@
         </div>
       </div>
 
-    <!-- Interactive Geo Map -->
-    <GeoMapLeaflet :key="timeRange" />
+    <!-- Live Threat Map with Real-time Attack Flows -->
+    <LiveThreatMap :key="timeRange" />
 
-    <!-- Network Topology Visualization - India Centric -->
-    <div class="card-glass p-6 rounded-xl border-t border-t-accent-primary/20">
-      <h3 class="text-lg font-black title-gradient mb-6">Network Topology</h3>
-      <Suspense>
-        <template #default>
-          <NetworkGraphLight v-model:modelValue="timeRange" :indiaCentric="true" />
-        </template>
-        <template #fallback>
-          <div class="flex items-center justify-center h-96">
-            <div class="text-slate-dark-400">Loading network topology...</div>
-          </div>
-        </template>
-      </Suspense>
-    </div>
+    
 
     <!-- Geo Statistics -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <div class="stat-card card-accent-cyan">
-        <div class="stat-value text-accent-primary">1</div>
-        <div class="stat-label">Country</div>
+    <div class="my-8">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div class="stat-card card-accent-cyan">
+          <div class="stat-value text-accent-primary">{{ uniqueCountries }}</div>
+          <div class="stat-label">Countries</div>
+        </div>
+        <div class="stat-card card-accent-purple">
+          <div class="stat-value text-accent-secondary">{{ uniqueCities }}</div>
+          <div class="stat-label">Cities</div>
+        </div>
+        <div class="stat-card card-accent-cyan">
+          <div class="stat-value text-accent-primary">{{ totalGeoEvents }}</div>
+          <div class="stat-label">Total Events</div>
+        </div>
+        <div class="stat-card card-accent-green">
+          <div class="stat-value text-neon-green">{{ avgEventsPerLocation }}</div>
+          <div class="stat-label">Avg Events/City</div>
+        </div>
       </div>
-      <div class="stat-card card-accent-purple">
-        <div class="stat-value text-accent-secondary">{{ uniqueCities }}</div>
-        <div class="stat-label">Indian Cities</div>
-      </div>
-      <div class="stat-card card-accent-cyan">
-        <div class="stat-value text-accent-primary">{{ totalGeoEvents }}</div>
-        <div class="stat-label">Total Events</div>
-      </div>
-      <div class="stat-card card-accent-green">
-        <div class="stat-value text-neon-green">{{ avgEventsPerLocation }}</div>
-        <div class="stat-label">Avg Events/City</div>
+    </div>
       </div>
     </div>
 
-    <!-- India Geo Table -->
-    <div class="card-glass p-6 rounded-xl border-t border-t-accent-cyan/10">
+    <!-- Global Geo Table -->
+    <div class="my-8">
+      <div class="card-glass p-6 rounded-xl border-t border-t-accent-cyan/10">
       <div class="flex items-center justify-between mb-6">
-        <h3 class="text-lg font-black title-gradient">India Regional Distribution</h3>
+        <h3 class="text-lg font-black title-gradient">Global Country Distribution</h3>
         <div class="flex gap-2">
-          <input v-model="searchLocation" type="text" placeholder="Search state/city..." class="input-cyber text-sm" />
+          <input v-model="searchLocation" type="text" placeholder="Search country/city..." class="input-cyber text-sm" />
           <button @click="filterGeoData" class="btn-cyber-outline">
             <i class="fas fa-search"></i>
           </button>
@@ -80,7 +72,7 @@
         <table class="table-cyber">
           <thead>
             <tr>
-              <th>State/UT</th>
+              <th>Country</th>
               <th>City</th>
               <th>Hit Count</th>
               <th>Severity</th>
@@ -92,7 +84,7 @@
           <tbody>
             <tr v-for="(item, idx) in geoTableData" :key="idx">
               <td>
-                <span class="font-semibold text-slate-dark-50">{{ getStateForCity(item.city) }}</span>
+                <span class="font-semibold text-slate-dark-50">{{ item.country }}</span>
               </td>
               <td class="text-slate-dark-400">{{ item.city }}</td>
               <td>
@@ -113,19 +105,20 @@
     </div>
 
     <!-- Top Critical Cities & Regions -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div class="my-8">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
       <div class="card-glass p-6 rounded-xl border-t border-t-accent-primary/10">
-        <h3 class="text-lg font-black title-gradient mb-6">Top Indian Cities by Events</h3>
+        <h3 class="text-lg font-black title-gradient mb-6">Top Countries by Events</h3>
         <div class="space-y-4">
-          <div v-for="(city, idx) in topCountries" :key="idx" class="space-y-2">
+          <div v-for="(country, idx) in topCountries" :key="idx" class="space-y-2">
             <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-slate-dark-300">{{ city.name }}</span>
-              <span class="text-sm font-bold text-slate-dark-50">{{ city.count }}</span>
+              <span class="text-sm font-medium text-slate-dark-300">{{ country.name }}</span>
+              <span class="text-sm font-bold text-slate-dark-50">{{ country.count }}</span>
             </div>
             <div class="w-full bg-slate-dark-900/50 rounded-full h-2 overflow-hidden border border-slate-dark-700/50">
               <div
                 class="h-full rounded-full bg-gradient-to-r from-cyber-500 to-neon-purple"
-                :style="{ width: `${(city.count / maxCountryCount) * 100}%` }"
+                :style="{ width: `${(country.count / maxCountryCount) * 100}%` }"
               />
             </div>
           </div>
@@ -133,7 +126,7 @@
       </div>
 
       <div class="card-glass p-6 rounded-xl border-t border-t-accent-secondary/10">
-        <h3 class="text-lg font-black title-gradient mb-6">Severity by Indian Cities</h3>
+        <h3 class="text-lg font-black title-gradient mb-6">Severity by Countries</h3>
         <div class="space-y-4">
           <div v-for="region in severityByRegion" :key="region.name" class="bg-slate-dark-900/50 rounded-lg p-3 border border-slate-dark-700/50">
             <div class="flex items-center justify-between mb-2">
@@ -168,8 +161,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useAPIStore } from '../stores/apiStore'
-import NetworkGraphLight from '../components/soc/NetworkGraphLight.vue'
-import GeoMapLeaflet from '../components/soc/GeoMapLeaflet.vue'
+import LiveThreatMap from '../components/soc/LiveThreatMap.vue'
 
 const apiStore = useAPIStore()
 const timeRange = ref('24h')
@@ -204,24 +196,24 @@ const fetchGeoData = async () => {
   }
 }
 
-// Sample geo data for fallback - India only
+// Sample geo data for fallback - Global
 const getSampleGeoData = () => {
   return [
-    { country: 'India', city: 'Mumbai', count: 150, lat: 19.0760, lon: 72.8777, severity: 'high' },
-    { country: 'India', city: 'Delhi', count: 120, lat: 28.7041, lon: 77.1025, severity: 'high' },
-    { country: 'India', city: 'Bangalore', count: 95, lat: 12.9716, lon: 77.5946, severity: 'medium' },
-    { country: 'India', city: 'Chennai', count: 85, lat: 13.0827, lon: 80.2707, severity: 'medium' },
-    { country: 'India', city: 'Kolkata', count: 75, lat: 22.5726, lon: 88.3639, severity: 'medium' },
-    { country: 'India', city: 'Hyderabad', count: 65, lat: 17.3850, lon: 78.4867, severity: 'low' },
-    { country: 'India', city: 'Pune', count: 55, lat: 18.5204, lon: 73.8567, severity: 'low' },
-    { country: 'India', city: 'Ahmedabad', count: 45, lat: 23.0225, lon: 72.5714, severity: 'low' },
-    { country: 'India', city: 'Jaipur', count: 35, lat: 26.9124, lon: 75.7873, severity: 'low' },
-    { country: 'India', city: 'Lucknow', count: 25, lat: 26.8467, lon: 80.9462, severity: 'low' },
-    { country: 'India', city: 'Chandigarh', count: 20, lat: 30.7333, lon: 76.7794, severity: 'low' },
-    { country: 'India', city: 'Indore', count: 18, lat: 22.7196, lon: 75.8577, severity: 'low' },
-    { country: 'India', city: 'Nagpur', count: 15, lat: 21.1458, lon: 79.0882, severity: 'low' },
-    { country: 'India', city: 'Kochi', count: 12, lat: 9.9312, lon: 76.2673, severity: 'low' },
-    { country: 'India', city: 'Coimbatore', count: 10, lat: 11.0168, lon: 76.9558, severity: 'low' }
+    { country: 'United States', city: 'New York', count: 150, lat: 40.7128, lon: -74.0060, severity: 'high' },
+    { country: 'United Kingdom', city: 'London', count: 120, lat: 51.5074, lon: -0.1278, severity: 'high' },
+    { country: 'Germany', city: 'Berlin', count: 95, lat: 52.5200, lon: 13.4050, severity: 'medium' },
+    { country: 'France', city: 'Paris', count: 85, lat: 48.8566, lon: 2.3522, severity: 'medium' },
+    { country: 'Japan', city: 'Tokyo', count: 75, lat: 35.6762, lon: 139.6503, severity: 'medium' },
+    { country: 'Australia', city: 'Sydney', count: 65, lat: -33.8688, lon: 151.2093, severity: 'low' },
+    { country: 'Canada', city: 'Toronto', count: 55, lat: 43.6532, lon: -79.3832, severity: 'low' },
+    { country: 'India', city: 'Mumbai', count: 45, lat: 19.0760, lon: 72.8777, severity: 'low' },
+    { country: 'Singapore', city: 'Singapore', count: 35, lat: 1.3521, lon: 103.8198, severity: 'low' },
+    { country: 'Brazil', city: 'São Paulo', count: 25, lat: -23.5505, lon: -46.6333, severity: 'low' },
+    { country: 'Mexico', city: 'Mexico City', count: 20, lat: 19.4326, lon: -99.1332, severity: 'low' },
+    { country: 'South Korea', city: 'Seoul', count: 18, lat: 37.5665, lon: 126.9780, severity: 'low' },
+    { country: 'Netherlands', city: 'Amsterdam', count: 15, lat: 52.3676, lon: 4.9041, severity: 'low' },
+    { country: 'United Arab Emirates', city: 'Dubai', count: 12, lat: 25.2048, lon: 55.2708, severity: 'low' },
+    { country: 'China', city: 'Shanghai', count: 10, lat: 31.2304, lon: 121.4737, severity: 'low' }
   ]
 }
 
@@ -238,54 +230,44 @@ onMounted(() => {
 
 const geoTableData = computed(() => {
   const data = apiStore.geoData || []
-  // Filter for India only
-  const indiaData = data.filter(item => item.country === 'India')
-  return indiaData.sort((a, b) => (b.count || 0) - (a.count || 0))
+  // Return all data sorted by count
+  return data.sort((a, b) => (b.count || 0) - (a.count || 0))
 })
 
 const uniqueCountries = computed(() => {
   const data = apiStore.geoData || []
-  // Filter for India only
-  const indiaData = data.filter(item => item.country === 'India')
-  const countries = new Set(indiaData.map(l => l.country).filter(Boolean))
+  const countries = new Set(data.map(l => l.country).filter(Boolean))
   return countries.size
 })
 
 const uniqueCities = computed(() => {
   const data = apiStore.geoData || []
-  // Filter for India only
-  const indiaData = data.filter(item => item.country === 'India')
-  const cities = new Set(indiaData.map(l => l.city).filter(Boolean))
+  const cities = new Set(data.map(l => l.city).filter(Boolean))
   return cities.size
 })
 
 const totalGeoEvents = computed(() => {
   const data = apiStore.geoData || []
-  // Filter for India only
-  const indiaData = data.filter(item => item.country === 'India')
-  return indiaData.reduce((sum, l) => sum + (l.count || 0), 0)
+  return data.reduce((sum, l) => sum + (l.count || 0), 0)
 })
 
 const avgEventsPerLocation = computed(() => {
   const data = apiStore.geoData || []
-  // Filter for India only
-  const indiaData = data.filter(item => item.country === 'India')
-  if (indiaData.length === 0) return 0
-  const total = indiaData.reduce((sum, l) => sum + (l.count || 0), 0)
-  return (total / indiaData.length).toFixed(1)
+  if (data.length === 0) return 0
+  const total = data.reduce((sum, l) => sum + (l.count || 0), 0)
+  return (total / data.length).toFixed(1)
 })
 
 const topCountries = computed(() => {
-  // Since we're focusing on India, show top cities instead
-  const cities = {}
+  // Group by country and sum counts
+  const countries = {}
   const data = apiStore.geoData || []
-  const indiaData = data.filter(item => item.country === 'India')
-  indiaData.forEach(item => {
-    if (item.city) {
-      cities[item.city] = (cities[item.city] || 0) + (item.count || 0)
+  data.forEach(item => {
+    if (item.country) {
+      countries[item.country] = (countries[item.country] || 0) + (item.count || 0)
     }
   })
-  return Object.entries(cities)
+  return Object.entries(countries)
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 8)
@@ -298,10 +280,9 @@ const maxCountryCount = computed(() => {
 const severityByRegion = computed(() => {
   const regions = {}
   const data = apiStore.geoData || []
-  // Filter for India only and group by city
-  const indiaData = data.filter(item => item.country === 'India')
-  indiaData.forEach(item => {
-    const region = item.city || 'Unknown'
+  // Group by country
+  data.forEach(item => {
+    const region = item.country || 'Unknown'
     if (!regions[region]) {
       regions[region] = { name: region, critical: 0, high: 0, medium: 0, low: 0, total: 0 }
     }
@@ -326,27 +307,5 @@ const getSeverityLabel = (count) => {
   if (count > 50) return 'High'
   if (count > 20) return 'Medium'
   return 'Low'
-}
-
-// Map Indian cities to their states
-const getStateForCity = (city) => {
-  const cityToState = {
-    'Mumbai': 'Maharashtra',
-    'Delhi': 'Delhi',
-    'Bangalore': 'Karnataka',
-    'Chennai': 'Tamil Nadu',
-    'Kolkata': 'West Bengal',
-    'Hyderabad': 'Telangana',
-    'Pune': 'Maharashtra',
-    'Ahmedabad': 'Gujarat',
-    'Jaipur': 'Rajasthan',
-    'Lucknow': 'Uttar Pradesh',
-    'Chandigarh': 'Chandigarh',
-    'Indore': 'Madhya Pradesh',
-    'Nagpur': 'Maharashtra',
-    'Kochi': 'Kerala',
-    'Coimbatore': 'Tamil Nadu'
-  }
-  return cityToState[city] || 'Unknown'
 }
 </script>

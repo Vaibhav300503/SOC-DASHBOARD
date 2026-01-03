@@ -14,7 +14,7 @@ const isConfigured = () => {
 const getClient = () => {
   if (!isConfigured()) return null
 
-  const authHeader = THEHIVE_AUTH_HEADER || THEHIVE_API_KEY
+  const authHeader = THEHIVE_AUTH_HEADER || `Bearer ${THEHIVE_API_KEY}`
 
   return axios.create({
     baseURL: THEHIVE_BASE_URL,
@@ -40,16 +40,36 @@ export const createAlertFromEvent = async (alertEvent) => {
 
     const path = THEHIVE_ALERTS_PATH || '/api/v1/alert'
 
+    // Convert severity to numeric value for TheHive
+    const getSeverityValue = (severity) => {
+      switch (severity?.toLowerCase()) {
+        case 'critical': return 3
+        case 'high': return 2
+        case 'medium': return 1
+        case 'low': return 0
+        default: return 1
+      }
+    }
+
     const payload = {
+      type: 'external',
+      source: 'SOC Dashboard',
+      sourceRef: `soc-${Date.now()}-${alertEvent._id || 'unknown'}`,
       title: alertEvent.title,
       description: alertEvent.description,
-      severity: alertEvent.severity,
-      source: alertEvent.source_ip,
-      destination: alertEvent.dest_ip,
+      severity: getSeverityValue(alertEvent.severity),
       tags: ['soc-dashboard'],
       artifacts: [
-        alertEvent.source_ip && { dataType: 'ip', data: alertEvent.source_ip },
-        alertEvent.dest_ip && { dataType: 'ip', data: alertEvent.dest_ip }
+        alertEvent.source_ip && { 
+          dataType: 'ip', 
+          data: alertEvent.source_ip,
+          message: 'Source IP'
+        },
+        alertEvent.dest_ip && { 
+          dataType: 'ip', 
+          data: alertEvent.dest_ip,
+          message: 'Destination IP'
+        }
       ].filter(Boolean)
     }
 

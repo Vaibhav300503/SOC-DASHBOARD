@@ -301,84 +301,314 @@
       </div>
 
       <!-- Settings Tab -->
-      <div v-else-if="activeTab === 'settings'" class="card-glass p-6">
-        <h3 class="text-lg font-semibold text-slate-dark-100 mb-6">Settings</h3>
-        <div class="text-center py-12">
-          <i class="fas fa-cog text-6xl text-slate-dark-600 mb-4"></i>
-          <p class="text-slate-dark-400">Settings page is under development</p>
-          <p class="text-sm text-slate-dark-500 mt-2">You can manage your preferences in the Profile tab</p>
+      <div v-else-if="activeTab === 'settings'" class="space-y-6">
+        <!-- Account Settings -->
+        <div class="card-glass p-6">
+          <h3 class="text-lg font-semibold text-slate-dark-100 mb-6 flex items-center">
+            <i class="fas fa-user-cog mr-3 text-cyber-400"></i>
+            Account Settings
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Language -->
+            <div>
+              <label class="block text-sm font-medium text-slate-dark-300 mb-2">Language</label>
+              <select v-model="settings.language" class="input-cyber w-full">
+                <option value="en">English</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="ja">Japanese</option>
+              </select>
+            </div>
+            <!-- Timezone -->
+            <div>
+              <label class="block text-sm font-medium text-slate-dark-300 mb-2">Timezone</label>
+              <select v-model="settings.timezone" class="input-cyber w-full">
+                <option value="UTC">UTC</option>
+                <option value="EST">Eastern Time (EST)</option>
+                <option value="CST">Central Time (CST)</option>
+                <option value="MST">Mountain Time (MST)</option>
+                <option value="PST">Pacific Time (PST)</option>
+              </select>
+            </div>
+            <!-- Date Format -->
+            <div>
+              <label class="block text-sm font-medium text-slate-dark-300 mb-2">Date Format</label>
+              <select v-model="settings.dateFormat" class="input-cyber w-full">
+                <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+              </select>
+            </div>
+            <!-- Time Format -->
+            <div>
+              <label class="block text-sm font-medium text-slate-dark-300 mb-2">Time Format</label>
+              <select v-model="settings.timeFormat" class="input-cyber w-full">
+                <option value="12h">12-Hour (AM/PM)</option>
+                <option value="24h">24-Hour</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+
+
+        <!-- Notification Settings -->
+        <div class="card-glass p-6">
+          <h3 class="text-lg font-semibold text-slate-dark-100 mb-6 flex items-center">
+            <i class="fas fa-bell mr-3 text-cyber-400"></i>
+            Notification Settings
+          </h3>
+          <div class="space-y-4">
+            <div class="flex items-center justify-between p-3 bg-slate-dark-800/30 rounded-lg">
+              <div>
+                <label class="text-sm font-medium text-slate-dark-300">Email Notifications</label>
+                <p class="text-xs text-slate-dark-500">Receive updates via email</p>
+              </div>
+              <input v-model="settings.notifications.email" type="checkbox" class="w-5 h-5" />
+            </div>
+
+            <div class="flex items-center justify-between p-3 bg-slate-dark-800/30 rounded-lg">
+              <div>
+                <label class="text-sm font-medium text-slate-dark-300">Browser Notifications</label>
+                <p class="text-xs text-slate-dark-500">Desktop notifications</p>
+              </div>
+              <input v-model="settings.notifications.browser" type="checkbox" class="w-5 h-5" />
+            </div>
+
+            <div class="flex items-center justify-between p-3 bg-slate-dark-800/30 rounded-lg">
+              <div>
+                <label class="text-sm font-medium text-slate-dark-300">Security Alerts</label>
+                <p class="text-xs text-slate-dark-500">Critical security notifications</p>
+              </div>
+              <input v-model="settings.notifications.alerts" type="checkbox" class="w-5 h-5" />
+            </div>
+
+            <div class="flex items-center justify-between p-3 bg-slate-dark-800/30 rounded-lg">
+              <div>
+                <label class="text-sm font-medium text-slate-dark-300">Weekly Digest</label>
+                <p class="text-xs text-slate-dark-500">Summary of your activity</p>
+              </div>
+              <input v-model="settings.notifications.digest" type="checkbox" class="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Privacy Settings -->
+        <div class="card-glass p-6">
+          <h3 class="text-lg font-semibold text-slate-dark-100 mb-6 flex items-center">
+            <i class="fas fa-lock mr-3 text-cyber-400"></i>
+            Privacy Settings
+          </h3>
+          <div class="space-y-4">
+            <div class="flex items-center justify-between p-3 bg-slate-dark-800/30 rounded-lg">
+              <div>
+                <label class="text-sm font-medium text-slate-dark-300">Profile Visibility</label>
+                <p class="text-xs text-slate-dark-500">Allow others to see your profile</p>
+              </div>
+              <select v-model="settings.privacy.profileVisibility" class="input-cyber w-32">
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+                <option value="team">Team Only</option>
+              </select>
+            </div>
+
+            <div class="flex items-center justify-between p-3 bg-slate-dark-800/30 rounded-lg">
+              <div>
+                <label class="text-sm font-medium text-slate-dark-300">Activity Tracking</label>
+                <p class="text-xs text-slate-dark-500">Allow tracking of your activities</p>
+              </div>
+              <input v-model="settings.privacy.activityTracking" type="checkbox" class="w-5 h-5" />
+            </div>
+
+            <div class="flex items-center justify-between p-3 bg-slate-dark-800/30 rounded-lg">
+              <div>
+                <label class="text-sm font-medium text-slate-dark-300">Analytics</label>
+                <p class="text-xs text-slate-dark-500">Help us improve with usage data</p>
+              </div>
+              <input v-model="settings.privacy.analytics" type="checkbox" class="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Save Settings Button -->
+        <div class="flex justify-end gap-3">
+          <button @click="resetSettings" class="btn-cyber-outline">
+            <i class="fas fa-undo mr-2"></i>Reset
+          </button>
+          <button @click="saveSettings" class="btn-cyber" :disabled="isLoading">
+            <i v-if="isLoading" class="fas fa-spinner fa-spin mr-2"></i>
+            {{ isLoading ? 'Saving...' : 'Save Settings' }}
+          </button>
         </div>
       </div>
 
       <!-- Activity Tab -->
-      <div v-else-if="activeTab === 'activity'" class="card-glass p-6">
-        <h3 class="text-lg font-semibold text-slate-dark-100 mb-6">Activity Monitor</h3>
+      <div v-else-if="activeTab === 'activity'" class="space-y-6">
+        <!-- Activity Stats Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div class="bg-slate-dark-800/50 p-6 rounded-lg">
+          <div class="card-glass p-6 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300">
             <div class="flex items-center justify-between mb-4">
-              <i class="fas fa-sign-in-alt text-2xl text-cyber-400"></i>
-              <span class="text-xs text-slate-dark-500">Last 30 days</span>
+              <div class="w-12 h-12 bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-sign-in-alt text-xl text-cyan-400"></i>
+              </div>
+              <span class="text-xs text-slate-dark-500 bg-slate-dark-800/50 px-2 py-1 rounded">Last 30 days</span>
             </div>
-            <div class="text-2xl font-bold text-slate-dark-100">{{ userStore.stats?.loginCount || 0 }}</div>
+            <div class="text-3xl font-bold text-slate-dark-100 mb-1">{{ userStore.stats?.loginCount || 0 }}</div>
             <div class="text-sm text-slate-dark-400">Total Logins</div>
+            <div class="mt-3 pt-3 border-t border-slate-dark-700/50">
+              <p class="text-xs text-slate-dark-500">Average: {{ Math.round((userStore.stats?.loginCount || 0) / 30) }} per day</p>
+            </div>
           </div>
           
-          <div class="bg-slate-dark-800/50 p-6 rounded-lg">
+          <div class="card-glass p-6 hover:shadow-lg hover:shadow-green-500/20 transition-all duration-300">
             <div class="flex items-center justify-between mb-4">
-              <i class="fas fa-exclamation-triangle text-2xl text-neon-green"></i>
-              <span class="text-xs text-slate-dark-500">Created</span>
+              <div class="w-12 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-exclamation-triangle text-xl text-green-400"></i>
+              </div>
+              <span class="text-xs text-slate-dark-500 bg-slate-dark-800/50 px-2 py-1 rounded">Created</span>
             </div>
-            <div class="text-2xl font-bold text-slate-dark-100">{{ userStore.stats?.alertsCreated || 0 }}</div>
+            <div class="text-3xl font-bold text-slate-dark-100 mb-1">{{ userStore.stats?.alertsCreated || 0 }}</div>
             <div class="text-sm text-slate-dark-400">Alerts Created</div>
+            <div class="mt-3 pt-3 border-t border-slate-dark-700/50">
+              <p class="text-xs text-slate-dark-500">Status: <span class="text-green-400">Active</span></p>
+            </div>
           </div>
           
-          <div class="bg-slate-dark-800/50 p-6 rounded-lg">
+          <div class="card-glass p-6 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300">
             <div class="flex items-center justify-between mb-4">
-              <i class="fas fa-file-alt text-2xl text-purple-400"></i>
-              <span class="text-xs text-slate-dark-500">Generated</span>
+              <div class="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-file-alt text-xl text-purple-400"></i>
+              </div>
+              <span class="text-xs text-slate-dark-500 bg-slate-dark-800/50 px-2 py-1 rounded">Generated</span>
             </div>
-            <div class="text-2xl font-bold text-slate-dark-100">{{ userStore.stats?.reportsGenerated || 0 }}</div>
+            <div class="text-3xl font-bold text-slate-dark-100 mb-1">{{ userStore.stats?.reportsGenerated || 0 }}</div>
             <div class="text-sm text-slate-dark-400">Reports Generated</div>
+            <div class="mt-3 pt-3 border-t border-slate-dark-700/50">
+              <p class="text-xs text-slate-dark-500">Last: {{ formatDate(userStore.stats?.lastReportDate) }}</p>
+            </div>
           </div>
           
-          <div class="bg-slate-dark-800/50 p-6 rounded-lg">
+          <div class="card-glass p-6 hover:shadow-lg hover:shadow-yellow-500/20 transition-all duration-300">
             <div class="flex items-center justify-between mb-4">
-              <i class="fas fa-eye text-2xl text-yellow-400"></i>
-              <span class="text-xs text-slate-dark-500">Viewed</span>
+              <div class="w-12 h-12 bg-gradient-to-br from-yellow-500/20 to-yellow-600/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-eye text-xl text-yellow-400"></i>
+              </div>
+              <span class="text-xs text-slate-dark-500 bg-slate-dark-800/50 px-2 py-1 rounded">Viewed</span>
             </div>
-            <div class="text-2xl font-bold text-slate-dark-100">{{ userStore.stats?.logsViewed || 0 }}</div>
+            <div class="text-3xl font-bold text-slate-dark-100 mb-1">{{ userStore.stats?.logsViewed || 0 }}</div>
             <div class="text-sm text-slate-dark-400">Logs Viewed</div>
+            <div class="mt-3 pt-3 border-t border-slate-dark-700/50">
+              <p class="text-xs text-slate-dark-500">Today: {{ Math.round((userStore.stats?.logsViewed || 0) / 30) }}</p>
+            </div>
           </div>
         </div>
-        
-        <div class="mt-8">
-          <h4 class="text-md font-medium text-slate-dark-300 mb-4">Recent Activity</h4>
-          <div class="space-y-3">
-            <div class="flex items-center justify-between p-3 bg-slate-dark-800/30 rounded-lg">
-              <div class="flex items-center gap-3">
-                <i class="fas fa-sign-in-alt text-cyber-400"></i>
-                <div>
-                  <div class="text-sm text-slate-dark-200">Last Login</div>
-                  <div class="text-xs text-slate-dark-500">{{ formatDate(userStore.stats?.lastLogin) }}</div>
-                </div>
+
+        <!-- Recent Activity Timeline -->
+        <div class="card-glass p-6">
+          <h3 class="text-lg font-semibold text-slate-dark-100 mb-6 flex items-center">
+            <i class="fas fa-history mr-3 text-cyber-400"></i>
+            Recent Activity Timeline
+          </h3>
+          <div class="space-y-4">
+            <div class="flex items-start gap-4 p-4 bg-slate-dark-800/30 rounded-lg hover:bg-slate-dark-800/50 transition-colors">
+              <div class="w-10 h-10 bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-sign-in-alt text-cyan-400"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-slate-dark-200">Last Login</div>
+                <div class="text-xs text-slate-dark-500">{{ formatDate(userStore.stats?.lastLogin) }}</div>
+              </div>
+              <span class="text-xs text-slate-dark-500 bg-slate-dark-700/50 px-2 py-1 rounded whitespace-nowrap">Just now</span>
+            </div>
+
+            <div class="flex items-start gap-4 p-4 bg-slate-dark-800/30 rounded-lg hover:bg-slate-dark-800/50 transition-colors">
+              <div class="w-10 h-10 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-check-circle text-green-400"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-slate-dark-200">Last Activity</div>
+                <div class="text-xs text-slate-dark-500">{{ formatDate(userStore.stats?.lastActivity) }}</div>
+              </div>
+              <span class="text-xs text-slate-dark-500 bg-slate-dark-700/50 px-2 py-1 rounded whitespace-nowrap">5 mins ago</span>
+            </div>
+
+            <div class="flex items-start gap-4 p-4 bg-slate-dark-800/30 rounded-lg hover:bg-slate-dark-800/50 transition-colors">
+              <div class="w-10 h-10 bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-calendar text-purple-400"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-slate-dark-200">Member Since</div>
+                <div class="text-xs text-slate-dark-500">{{ formatDate(userStore.user?.created_at) }}</div>
+              </div>
+              <span class="text-xs text-slate-dark-500 bg-slate-dark-700/50 px-2 py-1 rounded whitespace-nowrap">{{ getDaysSinceMember() }} days</span>
+            </div>
+
+            <div class="flex items-start gap-4 p-4 bg-slate-dark-800/30 rounded-lg hover:bg-slate-dark-800/50 transition-colors">
+              <div class="w-10 h-10 bg-gradient-to-br from-yellow-500/20 to-yellow-600/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-lock text-yellow-400"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-slate-dark-200">Last Password Change</div>
+                <div class="text-xs text-slate-dark-500">{{ formatDate(userStore.user?.security?.lastPasswordChange) }}</div>
+              </div>
+              <span class="text-xs text-slate-dark-500 bg-slate-dark-700/50 px-2 py-1 rounded whitespace-nowrap">{{ getDaysSincePasswordChange() }} days ago</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Activity Summary -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="card-glass p-6">
+            <h4 class="text-md font-semibold text-slate-dark-100 mb-4 flex items-center">
+              <i class="fas fa-chart-bar mr-2 text-cyber-400"></i>
+              Activity Summary
+            </h4>
+            <div class="space-y-3">
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-slate-dark-400">Total Sessions</span>
+                <span class="text-lg font-bold text-cyan-400">{{ userStore.stats?.totalSessions || 0 }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-slate-dark-400">Active Sessions</span>
+                <span class="text-lg font-bold text-green-400">{{ userStore.stats?.activeSessions || 1 }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-slate-dark-400">Failed Logins</span>
+                <span class="text-lg font-bold text-red-400">{{ userStore.user?.security?.failedLoginAttempts || 0 }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-slate-dark-400">Account Status</span>
+                <span class="text-lg font-bold text-green-400">Active</span>
               </div>
             </div>
-            <div class="flex items-center justify-between p-3 bg-slate-dark-800/30 rounded-lg">
-              <div class="flex items-center gap-3">
-                <i class="fas fa-clock text-slate-dark-400"></i>
-                <div>
-                  <div class="text-sm text-slate-dark-200">Last Activity</div>
-                  <div class="text-xs text-slate-dark-500">{{ formatDate(userStore.stats?.lastActivity) }}</div>
-                </div>
+          </div>
+
+          <div class="card-glass p-6">
+            <h4 class="text-md font-semibold text-slate-dark-100 mb-4 flex items-center">
+              <i class="fas fa-shield-alt mr-2 text-cyber-400"></i>
+              Security Status
+            </h4>
+            <div class="space-y-3">
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-slate-dark-400">2FA Status</span>
+                <span class="text-xs font-semibold px-2 py-1 rounded" :class="userStore.user?.security?.twoFactorEnabled ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'">
+                  {{ userStore.user?.security?.twoFactorEnabled ? 'Enabled' : 'Disabled' }}
+                </span>
               </div>
-            </div>
-            <div class="flex items-center justify-between p-3 bg-slate-dark-800/30 rounded-lg">
-              <div class="flex items-center gap-3">
-                <i class="fas fa-calendar text-slate-dark-400"></i>
-                <div>
-                  <div class="text-sm text-slate-dark-200">Member Since</div>
-                  <div class="text-xs text-slate-dark-500">{{ formatDate(userStore.user?.created_at) }}</div>
-                </div>
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-slate-dark-400">Account Locked</span>
+                <span class="text-xs font-semibold px-2 py-1 rounded" :class="userStore.user?.security?.lockedUntil ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'">
+                  {{ userStore.user?.security?.lockedUntil ? 'Yes' : 'No' }}
+                </span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-slate-dark-400">Last Security Audit</span>
+                <span class="text-sm text-slate-dark-300">{{ formatDate(userStore.stats?.lastSecurityAudit) }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-slate-dark-400">Risk Level</span>
+                <span class="text-xs font-semibold px-2 py-1 rounded bg-green-500/20 text-green-400">Low</span>
               </div>
             </div>
           </div>
@@ -478,6 +708,24 @@ const tabs = [
   { id: 'activity', label: 'Activity', icon: 'fas fa-chart-line' },
   { id: 'security', label: 'Security', icon: 'fas fa-shield-alt' }
 ]
+
+const settings = ref({
+  language: 'en',
+  timezone: 'UTC',
+  dateFormat: 'MM/DD/YYYY',
+  timeFormat: '12h',
+  notifications: {
+    email: true,
+    browser: true,
+    alerts: true,
+    digest: true
+  },
+  privacy: {
+    profileVisibility: 'team',
+    activityTracking: true,
+    analytics: true
+  }
+})
 
 const profileForm = ref({
   firstName: '',
@@ -660,5 +908,56 @@ const handleLogoutAllDevices = async () => {
   } finally {
     isLoggingOut.value = false
   }
+}
+
+const saveSettings = async () => {
+  try {
+    isLoading.value = true
+    // Simulate API call to save settings
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    addToast('Settings saved successfully', 'success')
+  } catch (error) {
+    addToast('Failed to save settings', 'error')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const resetSettings = () => {
+  settings.value = {
+    language: 'en',
+    timezone: 'UTC',
+    dateFormat: 'MM/DD/YYYY',
+    timeFormat: '12h',
+    notifications: {
+      email: true,
+      browser: true,
+      alerts: true,
+      digest: true
+    },
+    privacy: {
+      profileVisibility: 'team',
+      activityTracking: true,
+      analytics: true
+    }
+  }
+  addToast('Settings reset to defaults', 'info')
+}
+
+const getDaysSinceMember = () => {
+  if (!userStore.user?.created_at) return 0
+  const created = new Date(userStore.user.created_at)
+  const now = new Date()
+  const diff = now - created
+  return Math.floor(diff / (1000 * 60 * 60 * 24))
+}
+
+const getDaysSincePasswordChange = () => {
+  if (!userStore.user?.security?.lastPasswordChange) return 'Never'
+  const lastChange = new Date(userStore.user.security.lastPasswordChange)
+  const now = new Date()
+  const diff = now - lastChange
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  return days
 }
 </script>

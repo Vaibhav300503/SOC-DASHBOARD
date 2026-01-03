@@ -5,17 +5,17 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     port: 3000,
-    host: '0.0.0.0',
+    host: '0.0.0.0', // Listen on all interfaces for Tailscale access
     strictPort: true,
-    // Use default HMR settings for local development to avoid reload loops
+    // Proxy configuration for backend API
     proxy: {
       '/api': {
-        target: 'http://localhost:3002',
+        target: 'http://localhost:3002', // Match backend port
         changeOrigin: true,
         secure: false
       },
       '/ws': {
-        target: 'ws://localhost:3002',
+        target: 'ws://localhost:3002', // Match backend WebSocket port
         ws: true,
         changeOrigin: true,
         secure: false
@@ -25,5 +25,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true
+  },
+  optimizeDeps: {
+    exclude: ['cesium']
   }
 })

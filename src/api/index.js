@@ -6,3 +6,4 @@
 export { logsAPI, statsAPI } from './logs.js'
 export { tailscaleAPI } from './tailscale.js'
 export { agentsAPI } from './agents.js'
+export { geoThreatAPI } from './geoThreat.js'

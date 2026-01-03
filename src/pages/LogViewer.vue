@@ -14,7 +14,8 @@
         <div>
           <label class="block text-sm font-medium text-slate-dark-300 mb-2">Search Logs</label>
           <input
-            v-model="searchQuery"
+            :value="searchQuery"
+            @input="performSearch($event.target.value)"
             type="text"
             placeholder="Search by IP, endpoint, timestamp, or any field..."
             class="input-cyber w-full"
@@ -24,7 +25,11 @@
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label class="block text-sm font-medium text-slate-dark-300 mb-2">Severity</label>
-            <select v-model="filterSeverity" class="input-cyber w-full">
+            <select 
+              :value="filters.severity"
+              @change="updateFilter('severity', $event.target.value)"
+              class="input-cyber w-full"
+            >
               <option value="">All Severities</option>
               <option value="Critical">Critical</option>
               <option value="High">High</option>
@@ -35,7 +40,11 @@
 
           <div>
             <label class="block text-sm font-medium text-slate-dark-300 mb-2">Log Type</label>
-            <select v-model="filterLogType" class="input-cyber w-full">
+            <select 
+              :value="filters.logType"
+              @change="updateFilter('logType', $event.target.value)"
+              class="input-cyber w-full"
+            >
               <option value="">All Types</option>
               <option value="Firewall">Firewall</option>
               <option value="IDS">IDS</option>
@@ -47,7 +56,11 @@
 
           <div>
             <label class="block text-sm font-medium text-slate-dark-300 mb-2">Time Range</label>
-            <select v-model="filterTimeRange" class="input-cyber w-full">
+            <select 
+              :value="filters.timeRange"
+              @change="updateFilter('timeRange', $event.target.value)"
+              class="input-cyber w-full"
+            >
               <option value="24h">Last 24 Hours</option>
               <option value="7d">Last 7 Days</option>
               <option value="30d">Last 30 Days</option>
@@ -56,7 +69,7 @@
           </div>
 
           <div class="flex items-end">
-            <button @click="handleSearch" class="btn-cyber w-full" :disabled="!searchQuery && !filterSeverity && !filterLogType">
+            <button @click="handleSearch" class="btn-cyber w-full" :disabled="!searchQuery && !filters.severity && !filters.logType">
               <i class="fas fa-search mr-2"></i>Search
             </button>
           </div>
@@ -80,8 +93,8 @@
     <!-- Results Summary -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <div class="stat-card">
-        <div class="stat-value text-cyber-400">{{ filteredLogs.length }}</div>
-        <div class="stat-label">Results Found</div>
+        <div class="stat-value text-cyber-400">{{ apiStore.totalLogs }}</div>
+        <div class="stat-label">Total Logs</div>
       </div>
       <div class="stat-card">
         <div class="stat-value text-neon-red">{{ criticalInResults }}</div>
@@ -125,8 +138,8 @@
             <div class="flex items-start justify-between">
               <div class="flex-1">
                 <div class="flex items-center gap-3">
-                  <span :class="['badge-' + log.severity.toLowerCase()]">
-                    {{ log.severity }}
+                  <span :class="['badge-' + getSeverityClass(log.severity)]">
+                    {{ getSeverityLabel(log.severity) }}
                   </span>
                   <span class="text-sm font-mono text-cyber-400">{{ log.source_ip }}</span>
                   <span class="text-slate-dark-500">→</span>
@@ -158,20 +171,20 @@
       <!-- Pagination -->
       <div class="mt-6 flex items-center justify-between">
         <span class="text-sm text-slate-dark-400">
-          Showing {{ (currentPage - 1) * pageSize + 1 }} to {{ Math.min(currentPage * pageSize, filteredLogs.length) }} of {{ filteredLogs.length }}
+          Showing {{ (currentPage - 1) * 10 + 1 }} to {{ Math.min(currentPage * 10, filteredLogs.length) }} of {{ filteredLogs.length }}
         </span>
         <div class="flex gap-2">
           <button
-            @click="currentPage = Math.max(1, currentPage - 1)"
-            :disabled="currentPage === 1"
+            @click="prevPage"
+            :disabled="!canPrevPage"
             class="btn-cyber-outline disabled:opacity-50"
           >
             <i class="fas fa-chevron-left"></i>
           </button>
           <span class="px-3 py-2 text-sm text-slate-dark-300">{{ currentPage }} / {{ totalPages }}</span>
           <button
-            @click="currentPage = Math.min(totalPages, currentPage + 1)"
-            :disabled="currentPage === totalPages"
+            @click="nextPage"
+            :disabled="!canNextPage"
             class="btn-cyber-outline disabled:opacity-50"
           >
             <i class="fas fa-chevron-right"></i>
@@ -208,88 +221,60 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAPIStore } from '../stores/apiStore'
+import { useSearch } from '../composables/useSearch'
 import axios from 'axios'
 
 const apiStore = useAPIStore()
-const searchQuery = ref('')
-const filterSeverity = ref('')
-const filterLogType = ref('')
-const filterTimeRange = ref('24h')
-const useRegex = ref(false)
+const {
+  performSearch,
+  updateFilter,
+  clearAllSearch,
+  filteredLogs,
+  paginatedResults,
+  currentPage,
+  totalPages,
+  canNextPage,
+  canPrevPage,
+  nextPage,
+  prevPage,
+  getSeverityCounts,
+  getTopSourceIPs,
+  getTopEndpoints,
+  searchQuery,
+  filters
+} = useSearch({ pageSize: 10 })
+
 const expandedLogs = ref([])
-const currentPage = ref(1)
-const pageSize = ref(10)
 const isCopying = ref(false)
 const isCopyingIndividual = ref(null)
-const copyButtonState = ref('idle') // 'idle', 'copied'
+const copyButtonState = ref('idle')
 const copiedIndividualId = ref(null)
-const searchPerformed = ref(false)
+const useRegex = ref(false)
 
 onMounted(async () => {
   await apiStore.fetchRecentLogs(1000)
+  await apiStore.fetchDashboardStats()
 })
 
-const filteredLogs = computed(() => {
-  return apiStore.logs.filter(log => {
-    // Severity filter
-    if (filterSeverity.value && log.severity !== filterSeverity.value) return false
+const displayedLogs = computed(() => paginatedResults.value)
 
-    // Log type filter
-    if (filterLogType.value && log.log_type !== filterLogType.value) return false
-
-    // Search query
-    if (searchQuery.value) {
-      const query = searchQuery.value.toLowerCase()
-      const logStr = JSON.stringify(log).toLowerCase()
-      if (useRegex.value) {
-        try {
-          const regex = new RegExp(query)
-          if (!regex.test(logStr)) return false
-        } catch (e) {
-          return false
-        }
-      } else {
-        if (!logStr.includes(query)) return false
-      }
-    }
-
-    return true
-  })
+// Count severity from backend severity breakdown (same as Dashboard)
+// CRITICAL: All pages must use the same source for consistency
+const criticalInResults = computed(() => {
+  return apiStore.severityBreakdown.find(s => s._id === 'Critical')?.count || 0
+})
+const highInResults = computed(() => {
+  return apiStore.severityBreakdown.find(s => s._id === 'High')?.count || 0
+})
+const lowInResults = computed(() => {
+  return apiStore.severityBreakdown.find(s => s._id === 'Low')?.count || 0
 })
 
-const displayedLogs = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  return filteredLogs.value.slice(start, start + pageSize.value)
-})
-
-const totalPages = computed(() => Math.ceil(filteredLogs.value.length / pageSize.value))
-
-const criticalInResults = computed(() => filteredLogs.value.filter(l => l.severity === 'Critical').length)
-const highInResults = computed(() => filteredLogs.value.filter(l => l.severity === 'High').length)
-const lowInResults = computed(() => filteredLogs.value.filter(l => l.severity === 'Low').length)
-
-const topSourceIPsInResults = computed(() => {
-  const ips = {}
-  filteredLogs.value.forEach(log => {
-    ips[log.source_ip] = (ips[log.source_ip] || 0) + 1
-  })
-  return Object.entries(ips)
-    .map(([ip, count]) => ({ ip, count }))
-    .sort((a, b) => b.count - a.count)
-})
-
-const topEndpointsInResults = computed(() => {
-  const endpoints = {}
-  filteredLogs.value.forEach(log => {
-    endpoints[log.endpoint] = (endpoints[log.endpoint] || 0) + 1
-  })
-  return Object.entries(endpoints)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-})
+const topSourceIPsInResults = computed(() => getTopSourceIPs.value)
+const topEndpointsInResults = computed(() => getTopEndpoints.value)
 
 const toggleLogExpanded = (idx) => {
-  const actualIdx = (currentPage.value - 1) * pageSize.value + idx
+  const actualIdx = (currentPage.value - 1) * 10 + idx
   if (expandedLogs.value.includes(actualIdx)) {
     expandedLogs.value = expandedLogs.value.filter(i => i !== actualIdx)
   } else {
@@ -299,6 +284,24 @@ const toggleLogExpanded = (idx) => {
 
 const formatTime = (timestamp) => {
   return new Date(timestamp).toLocaleString()
+}
+
+const getSeverityClass = (severity) => {
+  if (!severity) return 'low'
+  const s = String(severity).toLowerCase().trim()
+  if (s.includes('critical')) return 'critical'
+  if (s.includes('high')) return 'high'
+  if (s.includes('medium')) return 'medium'
+  return 'low'
+}
+
+const getSeverityLabel = (severity) => {
+  if (!severity) return 'Low'
+  const s = String(severity).toLowerCase().trim()
+  if (s.includes('critical')) return 'Critical'
+  if (s.includes('high')) return 'High'
+  if (s.includes('medium')) return 'Medium'
+  return 'Low'
 }
 
 const getCopyButtonText = () => {
@@ -536,35 +539,12 @@ const copyLogJSON = async (log) => {
 }
 
 const handleSearch = () => {
-  // Mark that search has been performed
-  searchPerformed.value = true
-  
-  // Reset to first page when searching
-  currentPage.value = 1
-  
-  // Show feedback
-  const hasFilters = searchQuery.value || filterSeverity.value || filterLogType.value
-  
-  if (hasFilters) {
-    if (window.addToast) {
-      window.addToast(`Search applied: ${filteredLogs.value.length} results found`, 'success')
-    }
-  } else {
-    if (window.addToast) {
-      window.addToast('Please enter search criteria', 'warning')
-    }
-  }
+  // Search is now reactive via composable
+  // No need for manual trigger
 }
 
 const clearSearch = () => {
-  searchQuery.value = ''
-  filterSeverity.value = ''
-  filterLogType.value = ''
-  filterTimeRange.value = '24h'
-  useRegex.value = false
-  searchPerformed.value = false
-  currentPage.value = 1
-  
+  clearAllSearch()
   if (window.addToast) {
     window.addToast('Search cleared', 'info')
   }

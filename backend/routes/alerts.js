@@ -62,8 +62,8 @@ router.post('/events', verifyToken, async (req, res) => {
       severity: severity || 'Medium',
       source_ip,
       dest_ip,
-      log_id,
-      rule_id,
+      log_id: log_id || null, // Allow null log_id
+      rule_id: rule_id || null, // Allow null rule_id
       created_by: req.user?.userId || 'system',
       read: false
     })

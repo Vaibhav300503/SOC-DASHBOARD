@@ -4,13 +4,12 @@ const alertEventSchema = new mongoose.Schema({
   rule_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'AlertRule',
-    required: true,
+    required: false,
     index: true
   },
   log_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Log',
-    required: true
+    type: String, // Changed from ObjectId to String to accept frontend data
+    required: false // Made optional since frontend may not always provide it
   },
   severity: {
     type: String,
@@ -22,6 +21,10 @@ const alertEventSchema = new mongoose.Schema({
   description: String,
   source_ip: String,
   dest_ip: String,
+  created_by: {
+    type: String,
+    default: 'system'
+  },
   read: {
     type: Boolean,
     default: false,

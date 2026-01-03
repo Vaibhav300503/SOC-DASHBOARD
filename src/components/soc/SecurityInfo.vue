@@ -1,13 +1,13 @@
 <template>
-  <div class="card-glass p-6 rounded-xl">
+  <div class="card-glass p-7 rounded-xl">
     <div class="flex items-center justify-between mb-6">
-      <h3 class="text-lg font-semibold text-slate-dark-50 flex items-center gap-2">
-        <i class="fas fa-shield-alt text-cyber-400"></i>
+      <h3 class="text-lg font-semibold text-slate-50 flex items-center gap-2">
+        <i class="fas fa-shield-alt text-cyan-400"></i>
         Security & Session Info
       </h3>
       <button 
         @click="refreshSession"
-        class="text-xs px-3 py-1 rounded-lg bg-cyber-600/20 text-cyber-400 border border-cyber-500/50 hover:bg-cyber-600/30 transition-all"
+        class="text-xs px-3 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/20 transition-all font-medium"
         :disabled="refreshing"
       >
         <i :class="refreshing ? 'fas fa-spinner fa-spin' : 'fas fa-sync'" class="mr-1"></i>
@@ -18,48 +18,48 @@
     <!-- Session Info Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
       <!-- User Info -->
-      <div class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-        <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-2">Current User</div>
-        <div class="text-sm text-slate-dark-50 font-semibold">{{ userName }}</div>
-        <div class="text-xs text-slate-dark-500 mt-1">{{ userEmail }}</div>
-        <div class="text-xs text-cyber-400 mt-2">
+      <div class="bg-slate-800/30 rounded-lg p-4 border border-slate-700/40">
+        <div class="text-xs text-slate-400 uppercase tracking-wider mb-2 font-medium">Current User</div>
+        <div class="text-sm text-slate-100 font-semibold">{{ userName }}</div>
+        <div class="text-xs text-slate-500 mt-1">{{ userEmail }}</div>
+        <div class="text-xs text-cyan-400 mt-2 font-medium">
           <i class="fas fa-crown mr-1"></i>{{ userRole }}
         </div>
       </div>
 
       <!-- Session Duration -->
-      <div class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-        <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-2">Session Duration</div>
-        <div class="text-sm text-slate-dark-50 font-semibold">{{ sessionDuration }}</div>
-        <div class="text-xs text-slate-dark-500 mt-1">Logged in at {{ loginTime }}</div>
-        <div class="text-xs mt-2" :class="sessionStatus.color">
+      <div class="bg-slate-800/30 rounded-lg p-4 border border-slate-700/40">
+        <div class="text-xs text-slate-400 uppercase tracking-wider mb-2 font-medium">Session Duration</div>
+        <div class="text-sm text-slate-100 font-semibold">{{ sessionDuration }}</div>
+        <div class="text-xs text-slate-500 mt-1">Logged in at {{ loginTime }}</div>
+        <div class="text-xs mt-2 font-medium" :class="sessionStatus.color">
           <i :class="sessionStatus.icon" class="mr-1"></i>{{ sessionStatus.text }}
         </div>
       </div>
 
       <!-- Security Status -->
-      <div class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-        <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-2">Security Status</div>
+      <div class="bg-slate-800/30 rounded-lg p-4 border border-slate-700/40">
+        <div class="text-xs text-slate-400 uppercase tracking-wider mb-2 font-medium">Security Status</div>
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-2 h-2 rounded-full bg-neon-green"></div>
-          <span class="text-sm text-slate-dark-50">HTTPS Enabled</span>
+          <div class="w-2 h-2 rounded-full bg-emerald-400"></div>
+          <span class="text-sm text-slate-100">HTTPS Enabled</span>
         </div>
         <div class="flex items-center gap-2 mb-2">
-          <div class="w-2 h-2 rounded-full bg-neon-green"></div>
-          <span class="text-sm text-slate-dark-50">Token Encrypted</span>
+          <div class="w-2 h-2 rounded-full bg-emerald-400"></div>
+          <span class="text-sm text-slate-100">Token Encrypted</span>
         </div>
         <div class="flex items-center gap-2">
-          <div class="w-2 h-2 rounded-full bg-neon-green"></div>
-          <span class="text-sm text-slate-dark-50">Rate Limited</span>
+          <div class="w-2 h-2 rounded-full bg-emerald-400"></div>
+          <span class="text-sm text-slate-100">Rate Limited</span>
         </div>
       </div>
 
       <!-- Activity Summary -->
-      <div class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-        <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-2">Activity</div>
-        <div class="text-sm text-slate-dark-50 font-semibold">{{ activityCount }} actions</div>
-        <div class="text-xs text-slate-dark-500 mt-1">Last action: {{ lastAction }}</div>
-        <div class="text-xs text-neon-green mt-2">
+      <div class="bg-slate-800/30 rounded-lg p-4 border border-slate-700/40">
+        <div class="text-xs text-slate-400 uppercase tracking-wider mb-2 font-medium">Activity</div>
+        <div class="text-sm text-slate-100 font-semibold">{{ activityCount }} actions</div>
+        <div class="text-xs text-slate-500 mt-1">Last action: {{ lastAction }}</div>
+        <div class="text-xs text-emerald-400 mt-2 font-medium">
           <i class="fas fa-check-circle mr-1"></i>No suspicious activity
         </div>
       </div>

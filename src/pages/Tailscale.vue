@@ -140,46 +140,16 @@
       </div>
     </div>
 
-    <!-- User Sessions -->
-    <div class="card-glass p-6 rounded-xl">
-      <h3 class="text-lg font-semibold text-slate-dark-50 mb-6">User Sessions</h3>
-      <div class="overflow-x-auto">
-        <table class="table-cyber">
-          <thead>
-            <tr>
-              <th>User</th>
-              <th>Device</th>
-              <th>IP Address</th>
-              <th>Login Time</th>
-              <th>Last Activity</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="session in userSessions" :key="session.id">
-              <td class="font-semibold text-slate-dark-50">{{ session.user }}</td>
-              <td class="text-slate-dark-300">{{ session.device }}</td>
-              <td>
-                <code class="text-cyber-400 font-mono text-sm">{{ session.ip }}</code>
-              </td>
-              <td class="text-slate-dark-400 text-sm">{{ session.loginTime }}</td>
-              <td class="text-slate-dark-400 text-sm">{{ session.lastActivity }}</td>
-              <td>
-                <span class="px-2 py-1 rounded-full text-xs font-semibold bg-neon-green/20 text-neon-green">
-                  Active
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
     <!-- Peer Connections -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <div class="card-glass p-6 rounded-xl">
         <h3 class="text-lg font-semibold text-slate-dark-50 mb-6">Peer Connections</h3>
-        <div class="space-y-3">
+        <div v-if="peerConnections.length === 0" class="text-center py-12">
+          <i class="fas fa-link text-3xl text-slate-dark-600 mb-3 block"></i>
+          <p class="text-slate-dark-400 text-sm">No peer connections</p>
+          <p class="text-slate-dark-500 text-xs mt-1">Peer connections will appear here when established</p>
+        </div>
+        <div v-else class="space-y-3">
           <div v-for="peer in peerConnections" :key="peer.id" class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
             <div class="flex items-center justify-between mb-2">
               <span class="font-semibold text-slate-dark-50">{{ peer.name }}</span>
@@ -200,7 +170,12 @@
 
       <div class="card-glass p-6 rounded-xl">
         <h3 class="text-lg font-semibold text-slate-dark-50 mb-6">Subnet Routers</h3>
-        <div class="space-y-3">
+        <div v-if="subnetRouters.length === 0" class="text-center py-12">
+          <i class="fas fa-sitemap text-3xl text-slate-dark-600 mb-3 block"></i>
+          <p class="text-slate-dark-400 text-sm">No subnet routers configured</p>
+          <p class="text-slate-dark-500 text-xs mt-1">Subnet routers will appear here when configured</p>
+        </div>
+        <div v-else class="space-y-3">
           <div v-for="router in subnetRouters" :key="router.id" class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
             <div class="flex items-center justify-between mb-2">
               <span class="font-semibold text-slate-dark-50">{{ router.name }}</span>
@@ -221,28 +196,27 @@
     <div class="card-glass p-6 rounded-xl">
       <div class="flex items-center justify-between mb-6">
         <h3 class="text-lg font-semibold text-slate-dark-50">Tailscale Events</h3>
-        <div class="flex gap-2">
-          <select class="input-cyber text-sm">
-            <option>All Events</option>
-            <option>Connections</option>
-            <option>Authentications</option>
-            <option>Errors</option>
-          </select>
-        </div>
+        <select v-model="eventFilter" class="input-cyber text-sm">
+          <option value="">All Events</option>
+          <option value="CONNECTED">Connections</option>
+          <option value="AUTH">Authentications</option>
+          <option value="ERROR">Errors</option>
+        </select>
       </div>
 
       <div class="space-y-3">
-        <div v-for="event in tailscaleEvents" :key="event.id" class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
+        <div v-if="filteredEvents.length === 0" class="text-center py-8 text-slate-dark-500">
+          <i class="fas fa-inbox text-2xl mb-2 block opacity-50"></i>
+          <p class="text-sm">No events found</p>
+        </div>
+        <div v-for="(event, idx) in filteredEvents.slice(0, 5)" :key="idx" class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
           <div class="flex items-start justify-between">
             <div>
-              <p class="text-sm font-semibold text-slate-dark-50">{{ event.title }}</p>
-              <p class="text-xs text-slate-dark-400 mt-1">{{ event.description }}</p>
+              <p class="text-sm font-semibold text-slate-dark-50">{{ event.type }}</p>
+              <p class="text-xs text-slate-dark-400 mt-1">{{ event.message }}</p>
             </div>
-            <span :class="[
-              'px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ml-2',
-              event.type === 'success' ? 'bg-neon-green/20 text-neon-green' : 'bg-neon-orange/20 text-neon-orange'
-            ]">
-              {{ event.type }}
+            <span class="px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ml-2 bg-cyan-500/20 text-cyan-400">
+              Event
             </span>
           </div>
           <div class="text-xs text-slate-dark-500 mt-2">
@@ -253,13 +227,37 @@
     </div>
 
     <!-- Real-time Stream -->
-    <div class="card-glass p-6 rounded-xl">
-      <h3 class="text-lg font-semibold text-slate-dark-50 mb-6">Real-time Events Stream</h3>
-      <div class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50 font-mono text-xs text-slate-dark-300 h-48 overflow-y-auto">
-        <div v-for="(log, idx) in realtimeEvents" :key="idx" class="mb-2 pb-2 border-b border-slate-dark-700/50">
-          <span class="text-slate-dark-500">[{{ log.timestamp }}]</span>
-          <span class="text-cyber-400 ml-2">{{ log.type }}</span>
-          <span class="text-slate-dark-400 ml-2">{{ log.message }}</span>
+    <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-6 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group relative overflow-hidden">
+      <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+      <div class="relative z-10">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-lg font-bold text-slate-50">Real-time Events Stream</h3>
+          <div class="flex items-center gap-2">
+            <div :class="['w-2 h-2 rounded-full animate-pulse', tailscaleConfigured && isLive ? 'bg-emerald-500' : 'bg-slate-500']"></div>
+            <span class="text-xs font-medium" :class="tailscaleConfigured && isLive ? 'text-emerald-400' : 'text-slate-400'">
+              {{ tailscaleConfigured && isLive ? 'Live' : 'Offline' }}
+            </span>
+          </div>
+        </div>
+        <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700/30 font-mono text-xs text-slate-300 h-48 overflow-y-auto custom-scrollbar">
+          <div v-if="!tailscaleConfigured" class="text-center py-12 text-slate-400">
+            <i class="fas fa-exclamation-triangle text-2xl mb-2 block opacity-50 text-yellow-500"></i>
+            <p class="text-sm font-medium">{{ noDataMessage }}</p>
+            <p class="text-xs mt-2 opacity-75">Configure TAILSCALE_API_KEY in your backend .env file</p>
+          </div>
+          <div v-else-if="realtimeEvents.length === 0" class="text-center py-12 text-slate-500">
+            <i class="fas fa-inbox text-2xl mb-2 block opacity-50"></i>
+            <p class="text-sm">{{ noDataMessage }}</p>
+          </div>
+          <div v-else>
+            <div v-for="(log, idx) in realtimeEvents" :key="idx" class="mb-3 pb-3 border-b border-slate-700/50 last:border-b-0 hover:bg-slate-800/30 px-2 py-1 rounded transition-colors">
+              <div class="flex items-start gap-3">
+                <span class="text-slate-500 flex-shrink-0">[{{ log.timestamp }}]</span>
+                <span class="text-cyan-400 font-semibold flex-shrink-0">{{ log.type }}</span>
+                <span class="text-slate-400 break-words">{{ log.message }}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -274,6 +272,8 @@ import { tailscaleStreamService } from '../services/tailscaleStreamService'
 import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3002/api'
+
+let refreshInterval = null
 
 const getAuthHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem('token')}`
@@ -290,30 +290,30 @@ const devices = ref([])
 const userSessions = ref([])
 const peerConnections = ref([])
 const subnetRouters = ref([])
-const tailscaleEvents = ref([])
 const realtimeEvents = ref([])
 const searchDevice = ref('')
 const loading = ref(true)
 const isLive = ref(false)
 const isSyncing = ref(false)
 const streamUnsubscribers = ref([])
+const tailscaleConfigured = ref(false)
+const noDataMessage = ref('Loading data...')
+const eventFilter = ref('')
 
 // Network status computed values
 const networkHealth = computed(() => {
   if (!devices.value.length) return 0
   
-  const onlineDevices = devices.value.filter(d => d.status === 'online').length
+  const onlineDevices = devices.value.filter(d => d.status === 'online' || d.status === 'Online').length
   const totalDevices = devices.value.length
   
   // Calculate health based on online devices and recent activity
   const deviceHealth = (onlineDevices / totalDevices) * 100
   
-  // Factor in recent activity (if there are recent logs, network is healthier)
-  const recentActivity = tailscaleEvents.value.filter(
-    e => new Date(e.ts) > new Date(Date.now() - 5 * 60 * 1000)
-  ).length
+  // Factor in recent activity (if there are recent events, network is healthier)
+  const recentActivity = realtimeEvents.value.length > 0 ? 1 : 0
   
-  const activityBonus = Math.min(recentActivity * 5, 20) // Max 20% bonus
+  const activityBonus = recentActivity * 10 // 10% bonus if there are recent events
   
   return Math.min(Math.round(deviceHealth + activityBonus), 100)
 })
@@ -348,49 +348,36 @@ const avgLatency = computed(() => {
   return Math.round(baseLatency)
 })
 
+const filteredEvents = computed(() => {
+  if (!eventFilter.value) {
+    return realtimeEvents.value
+  }
+  
+  return realtimeEvents.value.filter(event => {
+    const eventType = event.type.toUpperCase()
+    const filterType = eventFilter.value.toUpperCase()
+    
+    if (filterType === 'CONNECTED') {
+      return eventType.includes('CONNECTED') || eventType.includes('CONNECTION')
+    }
+    if (filterType === 'AUTH') {
+      return eventType.includes('AUTH')
+    }
+    if (filterType === 'ERROR') {
+      return eventType.includes('ERROR') || eventType.includes('FAILED')
+    }
+    
+    return true
+  })
+})
+
 // Connect to SSE stream for real-time Tailscale logs
 const connectStream = () => {
   try {
-    console.log('Connecting to Tailscale SSE stream...')
-    
-    // Subscribe to connection events
-    const unsubConnect = tailscaleStreamService.on('connected', (data) => {
-      console.log('Connected to Tailscale stream:', data)
-      isLive.value = true
-    })
-    
-    // Subscribe to log events
-    const unsubLog = tailscaleStreamService.on('log', (log) => {
-      addRealtimeEvent(log)
-      updateStats(log)
-    })
-    
-    // Subscribe to stats updates
-    const unsubStats = tailscaleStreamService.on('stats', (stats) => {
-      console.log('Received Tailscale stats update:', stats)
-      // Update stats from server
-      if (stats.total) {
-        tailscaleStats.value.activeDevices = stats.total
-      }
-    })
-    
-    // Subscribe to error events
-    const unsubError = tailscaleStreamService.on('error', (error) => {
-      console.error('Stream error:', error)
-      isLive.value = false
-    })
-    
-    // Subscribe to disconnection events
-    const unsubDisconnect = tailscaleStreamService.on('disconnected', () => {
-      console.log('Disconnected from Tailscale stream')
-      isLive.value = false
-    })
-    
-    // Store unsubscribers
-    streamUnsubscribers.value = [unsubConnect, unsubLog, unsubStats, unsubError, unsubDisconnect]
-    
-    // Connect to stream
-    tailscaleStreamService.connect()
+    console.log('Stream service disabled - using polling instead')
+    isLive.value = true
+    // Don't connect to stream to avoid rate limiting
+    // Stream will be replaced with periodic polling
   } catch (error) {
     console.error('Failed to connect to stream:', error)
     isLive.value = false
@@ -400,12 +387,8 @@ const connectStream = () => {
 // Disconnect from stream
 const disconnectStream = () => {
   try {
-    // Unsubscribe from all events
-    streamUnsubscribers.value.forEach(unsub => unsub())
-    streamUnsubscribers.value = []
-    
-    // Disconnect from stream
-    tailscaleStreamService.disconnect()
+    console.log('Disconnecting from stream service')
+    // Stream is disabled, nothing to disconnect
     isLive.value = false
   } catch (error) {
     console.error('Error disconnecting from stream:', error)
@@ -414,28 +397,17 @@ const disconnectStream = () => {
 
 // Add real-time event to the stream
 const addRealtimeEvent = (log) => {
+  if (!tailscaleConfigured.value) return
+  
   const event = {
-    timestamp: new Date(log.ts).toLocaleTimeString(),
-    type: log.type.toUpperCase(),
-    message: log.event || `${log.type} from ${log.user || 'unknown'}`
+    timestamp: new Date(log.ts || log.timestamp).toLocaleTimeString(),
+    type: (log.type || log.event_type || 'EVENT').toUpperCase(),
+    message: log.message || log.event || `${log.type} from ${log.user || 'unknown'}`
   }
   
   realtimeEvents.value.unshift(event)
   if (realtimeEvents.value.length > 50) {
     realtimeEvents.value.pop()
-  }
-  
-  // Also add to events list
-  tailscaleEvents.value.unshift({
-    id: log._id,
-    title: formatEventTitle(log.type),
-    description: log.event || `${log.type} event`,
-    type: log.type.includes('failed') || log.type.includes('denied') ? 'warning' : 'success',
-    timestamp: formatTimeAgo(log.ts)
-  })
-  
-  if (tailscaleEvents.value.length > 20) {
-    tailscaleEvents.value.pop()
   }
 }
 
@@ -536,17 +508,28 @@ const processRecentLogs = (logs) => {
 // Fetch initial data
 const fetchTailscaleData = async () => {
   try {
+    console.log('Fetching Tailscale data from:', API_BASE)
+    
     // Get stats and devices in parallel
     const [statsResponse, devicesResponse] = await Promise.all([
       axios.get(
         `${API_BASE}/tailscale/stats`,
         { headers: getAuthHeaders() }
-      ),
+      ).catch(err => {
+        console.error('Stats API error:', err.message)
+        return { data: null }
+      }),
       axios.get(
         `${API_BASE}/tailscale/devices`,
         { headers: getAuthHeaders() }
-      )
+      ).catch(err => {
+        console.error('Devices API error:', err.message)
+        return { data: null }
+      })
     ])
+    
+    console.log('Stats response:', statsResponse.data)
+    console.log('Devices response:', devicesResponse.data)
     
     // Update stats
     if (statsResponse.data) {
@@ -556,18 +539,74 @@ const fetchTailscaleData = async () => {
         peerConnections: statsResponse.data.peerConnections || 0,
         exitNodes: 3, // Default value
       }
+      tailscaleConfigured.value = true
     }
     
     // Update devices list with live data
     if (devicesResponse.data && devicesResponse.data.data) {
       // Backend already provides transformed data, just use it directly
       devices.value = devicesResponse.data.data
+      tailscaleConfigured.value = true
+      
+      // Update stats from devices if stats API failed
+      if (!statsResponse.data) {
+        tailscaleStats.value.activeDevices = devicesResponse.data.data.length
+      }
+      
+      // Extract user sessions from devices
+      const sessions = new Map()
+      devicesResponse.data.data.forEach(device => {
+        if (device.user) {
+          const key = `${device.user}-${device.ip}`
+          if (!sessions.has(key)) {
+            sessions.set(key, {
+              id: key,
+              user: device.user,
+              device: device.name || 'Unknown Device',
+              ip: device.ip || 'Unknown IP',
+              loginTime: new Date(device.lastSeen).toLocaleTimeString(),
+              lastActivity: formatTimeAgo(device.lastSeen)
+            })
+          }
+        }
+      })
+      userSessions.value = Array.from(sessions.values()).slice(0, 10)
     }
+    
+    // Initialize real-time events from devices activity
+    if (devicesResponse.data && devicesResponse.data.data) {
+      realtimeEvents.value = devicesResponse.data.data.slice(0, 10).map((device, idx) => ({
+        timestamp: new Date(device.lastSeen).toLocaleTimeString(),
+        type: device.status === 'online' ? 'CONNECTED' : 'DISCONNECTED',
+        message: `Device "${device.name}" is ${device.status}`
+      }))
+      
+      if (realtimeEvents.value.length === 0) {
+        noDataMessage.value = 'No device activity available'
+      }
+    }
+    
+    // Extract peer connections and subnet routers from stats
+    if (statsResponse.data) {
+      if (statsResponse.data.peerConnections) {
+        peerConnections.value = statsResponse.data.peerConnections
+      }
+      if (statsResponse.data.subnetRouters) {
+        subnetRouters.value = statsResponse.data.subnetRouters
+      }
+    }
+    
+    tailscaleConfigured.value = true
   } catch (error) {
     console.error('Failed to fetch Tailscale data:', error)
-    // Add user-facing error message
+    console.error('API_BASE:', API_BASE)
+    console.error('Error details:', error.response?.data || error.message)
+    
+    tailscaleConfigured.value = false
+    noDataMessage.value = `Failed to connect to Tailscale API. Error: ${error.message}`
+    
     if (window.addToast) {
-      window.addToast('Failed to fetch Tailscale data. Please check your connection and try again.', 'error')
+      window.addToast(`Failed to fetch Tailscale data: ${error.message}`, 'error')
     }
   } finally {
     loading.value = false
@@ -769,9 +808,17 @@ const exportTailscaleData = async () => {
 onMounted(() => {
   fetchTailscaleData()
   connectStream()
+  
+  // Auto-refresh data every 30 seconds instead of using stream
+  refreshInterval = setInterval(() => {
+    fetchTailscaleData()
+  }, 30000)
 })
 
 onUnmounted(() => {
+  if (refreshInterval) {
+    clearInterval(refreshInterval)
+  }
   disconnectStream()
 })
 

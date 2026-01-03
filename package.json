@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:tailscale": "vite --host 0.0.0.0 --port 3000",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
+    "start:tailscale": "concurrently \"cd backend && npm start\" \"npm run dev:tailscale\"",
+    "test:tailscale": "curl http://100.100.83.123:3002/health && curl http://100.100.83.123:3000"
   },
   "dependencies": {
     "apexcharts": "3.49.0",
@@ -19,6 +22,7 @@
     "leaflet.markercluster": "^1.5.3",
     "ngrok": "^5.0.0-beta.2",
     "pinia": "^2.1.4",
+    "three": "^0.182.0",
     "vue": "^3.3.4",
     "vue-router": "^4.2.4",
     "vue3-apexcharts": "1.7.0",

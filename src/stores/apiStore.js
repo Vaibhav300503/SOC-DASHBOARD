@@ -5,6 +5,7 @@ import { tailscaleAPI } from '../api/tailscale'
 import { eventsAPI } from '../api/events'
 import { alertsAPI } from '../api/alerts'
 import { agentsAPI } from '../api/agents'
+import { geoThreatAPI } from '../api/geoThreat'
 
 export const useAPIStore = defineStore('api', () => {
   // State
@@ -304,8 +305,60 @@ export const useAPIStore = defineStore('api', () => {
     }
   }
 
+  // Fetch live threat map data
+  const fetchLiveThreatMapData = async (timeRange = '24h') => {
+    loading.value = true
+    error.value = null
+    try {
+      const data = await geoThreatAPI.getLiveThreatMapData(timeRange)
+      return data
+    } catch (err) {
+      error.value = err.message
+      console.error('Failed to fetch live threat map data:', err)
+      return { success: false, data: [] }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Fetch threat flows
+  const fetchThreatFlows = async (timeRange = '24h', limit = 100) => {
+    loading.value = true
+    error.value = null
+    try {
+      const data = await geoThreatAPI.getThreatFlows(timeRange, limit)
+      return data
+    } catch (err) {
+      error.value = err.message
+      console.error('Failed to fetch threat flows:', err)
+      return { success: false, data: [] }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Fetch threat statistics
+  const fetchThreatStats = async (timeRange = '24h') => {
+    loading.value = true
+    error.value = null
+    try {
+      const data = await geoThreatAPI.getThreatStats(timeRange)
+      return data
+    } catch (err) {
+      error.value = err.message
+      console.error('Failed to fetch threat stats:', err)
+      return { success: false, stats: {} }
+    } finally {
+      loading.value = false
+    }
+  }
+
   // Computed properties
-  const totalLogs = computed(() => dashboardStats.value?.totalLogs || 0)
+  const totalLogs = computed(() => {
+    const logs = dashboardStats.value?.totalLogs || 0
+    const cases = dashboardStats.value?.totalCases || 0
+    return logs + cases
+  })
   const totalEvents = computed(() => dashboardStats.value?.totalEvents || 0)
   const total = computed(() => dashboardStats.value?.total || 0)
   const severityBreakdown = computed(() => dashboardStats.value?.severityBreakdown || [])
@@ -318,6 +371,138 @@ export const useAPIStore = defineStore('api', () => {
   const totalAlerts = computed(() => alertMetrics.value?.totalAlerts || 0)
   const criticalAlerts = computed(() => alertMetrics.value?.criticalAlerts || 0)
   const analyzedAlerts = computed(() => alertMetrics.value?.analyzedAlerts || 0)
+  const criticalLogs = computed(() => {
+    const breakdown = severityBreakdown.value
+    const critical = breakdown.find(s => s._id === 'Critical')
+    return critical?.count || 0
+  })
+  const highLogs = computed(() => {
+    const breakdown = severityBreakdown.value
+    const high = breakdown.find(s => s._id === 'High')
+    return high?.count || 0
+  })
+  const mediumLogs = computed(() => {
+    const breakdown = severityBreakdown.value
+    const medium = breakdown.find(s => s._id === 'Medium')
+    return medium?.count || 0
+  })
+
+  // Aggregate logs by source IP with real severity data
+  const aggregatedSourceIPs = computed(() => {
+    const ipMap = new Map()
+    
+    logs.value.forEach(log => {
+      const ip = log.source_ip
+      if (!ip) return
+      
+      if (!ipMap.has(ip)) {
+        ipMap.set(ip, {
+          _id: ip,
+          ip: ip,
+          count: 0,
+          severity: 'Low',
+          severityPriority: 1,
+          lastSeen: null,
+          firstSeen: null,
+          endpoints: new Set(),
+          logTypes: new Set()
+        })
+      }
+      
+      const entry = ipMap.get(ip)
+      entry.count += 1
+      entry.endpoints.add(log.endpoint)
+      entry.logTypes.add(log.log_type)
+      
+      // Update timestamps
+      const logTime = new Date(log.timestamp)
+      if (!entry.lastSeen || logTime > entry.lastSeen) {
+        entry.lastSeen = logTime
+      }
+      if (!entry.firstSeen || logTime < entry.firstSeen) {
+        entry.firstSeen = logTime
+      }
+      
+      // Update severity to HIGHEST PRIORITY from actual log severity (NOT count-based)
+      // CRITICAL: Use actual severity field, not event count
+      const logSeverity = log.severity || 'Low'
+      const severityPriority = { 'Critical': 4, 'High': 3, 'Medium': 2, 'Low': 1 }
+      const logPriority = severityPriority[logSeverity] || 1
+      
+      // Only update if this log has higher severity priority
+      if (logPriority > entry.severityPriority) {
+        entry.severity = logSeverity
+        entry.severityPriority = logPriority
+      }
+    })
+    
+    // Convert to array and sort by count descending
+    return Array.from(ipMap.values())
+      .map(entry => ({
+        ...entry,
+        endpoints: Array.from(entry.endpoints),
+        logTypes: Array.from(entry.logTypes)
+      }))
+      .sort((a, b) => b.count - a.count)
+  })
+
+  // Aggregate logs by destination IP with real severity data
+  const aggregatedDestinationIPs = computed(() => {
+    const ipMap = new Map()
+    
+    logs.value.forEach(log => {
+      const ip = log.dest_ip
+      if (!ip) return
+      
+      if (!ipMap.has(ip)) {
+        ipMap.set(ip, {
+          _id: ip,
+          ip: ip,
+          count: 0,
+          severity: 'Low',
+          severityPriority: 1,
+          lastSeen: null,
+          firstSeen: null,
+          endpoints: new Set(),
+          logTypes: new Set()
+        })
+      }
+      
+      const entry = ipMap.get(ip)
+      entry.count += 1
+      entry.endpoints.add(log.endpoint)
+      entry.logTypes.add(log.log_type)
+      
+      // Update timestamps
+      const logTime = new Date(log.timestamp)
+      if (!entry.lastSeen || logTime > entry.lastSeen) {
+        entry.lastSeen = logTime
+      }
+      if (!entry.firstSeen || logTime < entry.firstSeen) {
+        entry.firstSeen = logTime
+      }
+      
+      // Update severity to HIGHEST PRIORITY from actual log severity (NOT count-based)
+      // CRITICAL: Use actual severity field, not event count
+      const logSeverity = log.severity || 'Low'
+      const severityPriority = { 'Critical': 4, 'High': 3, 'Medium': 2, 'Low': 1 }
+      const logPriority = severityPriority[logSeverity] || 1
+      
+      if (logPriority > entry.severityPriority) {
+        entry.severity = logSeverity
+        entry.severityPriority = logPriority
+      }
+    })
+    
+    // Convert to array and sort by count descending
+    return Array.from(ipMap.values())
+      .map(entry => ({
+        ...entry,
+        endpoints: Array.from(entry.endpoints),
+        logTypes: Array.from(entry.logTypes)
+      }))
+      .sort((a, b) => b.count - a.count)
+  })
 
   return {
     // State
@@ -356,6 +541,9 @@ export const useAPIStore = defineStore('api', () => {
     searchEvents,
     fetchAgents,
     fetchRecentCases,
+    fetchLiveThreatMapData,
+    fetchThreatFlows,
+    fetchThreatStats,
 
     // Computed
     totalLogs,
@@ -371,6 +559,11 @@ export const useAPIStore = defineStore('api', () => {
     totalAlerts,
     criticalAlerts,
     analyzedAlerts,
+    criticalLogs,
+    highLogs,
+    mediumLogs,
+    aggregatedSourceIPs,
+    aggregatedDestinationIPs,
     agents
   }
 })

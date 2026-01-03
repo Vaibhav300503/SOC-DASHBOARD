@@ -1,37 +1,47 @@
 <template>
-  <div class="card-glass p-6 rounded-xl h-full border-t border-t-accent-primary/10">
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="text-lg font-black title-gradient">{{ title }}</h3>
-      <span class="px-2 py-0.5 bg-accent-primary/10 text-accent-primary text-[10px] font-bold rounded">TOP ACTIVITES</span>
+  <div class="card-glass p-7 rounded-xl h-full">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="text-lg font-semibold text-slate-50">{{ title }}</h3>
+      <span class="px-2.5 py-1 bg-cyan-500/10 text-cyan-400 text-[10px] font-medium rounded-md border border-cyan-500/20 uppercase tracking-wider">TOP ACTIVITIES</span>
     </div>
-    <div class="overflow-x-auto">
-      <table class="table-cyber text-xs">
-        <thead>
-          <tr>
-            <th class="w-1/2">IP Address</th>
-            <th class="w-1/4 text-right">Events</th>
-            <th class="w-1/4 text-right">Severity</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(row, idx) in normalizedData" :key="idx" :class="['ip-row', 'severity-' + row.severityClass]">
-            <td>
-              <code class="text-cyber-400 font-mono text-xs">{{ row.ip }}</code>
-            </td>
-            <td class="text-right text-slate-dark-300">
-              {{ row.count }}
-            </td>
-            <td class="text-right">
-              <span :class="['severity-pill', 'severity-' + row.severityClass]">
-                {{ row.severityLabel }}
-              </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-if="normalizedData.length === 0" class="empty-table-state">
-  <i class='fas fa-shield-alt muted-icon'></i>
-        No IP data available
+    <div class="bg-slate-800/20 rounded-lg border border-slate-700/40 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="border-b border-slate-700/50 bg-slate-800/30">
+              <th class="w-1/2 text-left py-3 px-4 text-slate-400 font-medium uppercase tracking-wider">IP Address</th>
+              <th class="w-1/4 text-right py-3 px-4 text-slate-400 font-medium uppercase tracking-wider">Events</th>
+              <th class="w-1/4 text-right py-3 px-4 text-slate-400 font-medium uppercase tracking-wider">Severity</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, idx) in normalizedData" :key="idx" class="border-b border-slate-700/30 hover:bg-slate-800/40 transition-colors">
+              <td class="py-3 px-4">
+                <code class="text-cyan-400 font-mono text-xs">{{ row.ip }}</code>
+              </td>
+              <td class="text-right py-3 px-4 text-slate-300 font-semibold">
+                {{ row.count }}
+              </td>
+              <td class="text-right py-3 px-4">
+                <span 
+                  :class="[
+                    'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider',
+                    row.severityClass === 'critical' ? 'bg-red-500/10 text-red-400 border border-red-500/30' :
+                    row.severityClass === 'high' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/30' :
+                    row.severityClass === 'medium' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/30' :
+                    'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                  ]"
+                >
+                  {{ row.severityLabel }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-if="normalizedData.length === 0" class="text-center py-12 text-slate-500">
+        <i class="fas fa-shield-alt text-4xl mb-3 block text-slate-600"></i>
+        <p class="text-sm">No IP data available</p>
       </div>
     </div>
   </div>
@@ -55,18 +65,27 @@ const normalizedData = computed(() => {
   return (props.data || []).map(item => {
     const ip = item.ip || item._id || 'Unknown'
     const count = item.count || item.value || 0
-
+    
+    // Use real severity from aggregated data if available, otherwise default to Low
     let severityClass = 'low'
     let severityLabel = 'Low'
-    if (count > 100) {
-      severityClass = 'critical'
-      severityLabel = 'Critical'
-    } else if (count > 50) {
-      severityClass = 'high'
-      severityLabel = 'High'
-    } else if (count > 20) {
-      severityClass = 'medium'
-      severityLabel = 'Medium'
+    
+    if (item.severity) {
+      // Use actual severity from log aggregation
+      const severity = String(item.severity).toLowerCase()
+      if (severity.includes('critical')) {
+        severityClass = 'critical'
+        severityLabel = 'Critical'
+      } else if (severity.includes('high')) {
+        severityClass = 'high'
+        severityLabel = 'High'
+      } else if (severity.includes('medium')) {
+        severityClass = 'medium'
+        severityLabel = 'Medium'
+      } else {
+        severityClass = 'low'
+        severityLabel = 'Low'
+      }
     }
 
     return { ip, count, severityClass, severityLabel }

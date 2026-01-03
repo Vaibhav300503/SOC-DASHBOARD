@@ -18,6 +18,17 @@ export const generateToken = (userId, email, role) => {
  * Verify JWT token middleware
  */
 export const verifyToken = (req, res, next) => {
+  // Check if auth bypass is enabled
+  if (process.env.BYPASS_AUTH === 'true') {
+    // Create a mock user for bypass mode
+    req.user = {
+      userId: 'bypass-user',
+      email: 'bypass@localhost',
+      role: 'admin'
+    }
+    return next()
+  }
+
   try {
     const token = req.headers.authorization?.split(' ')[1] || req.cookies?.token
 
@@ -47,8 +58,9 @@ export const verifyToken = (req, res, next) => {
 }
 
 /**
- * Check user role
+ * Alias for verifyToken - used in some routes
  */
+export const requireAuth = verifyToken
 export const requireRole = (allowedRoles = []) => {
   return (req, res, next) => {
     if (!req.user) {

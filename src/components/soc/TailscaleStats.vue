@@ -1,14 +1,13 @@
 <template>
-  <div class="card-glass p-6 rounded-xl">
-    <div class="flex items-center justify-between mb-6">
+  <div>
+    <div class="flex items-center justify-between mb-5">
       <div class="flex items-center gap-3">
-        <h3 class="text-lg font-semibold text-slate-dark-50">Tailscale Network Status</h3>
         <div class="flex items-center gap-2 text-xs">
           <div :class="[
             'w-2 h-2 rounded-full',
-            dashboardData.syncStatus?.status === 'success' ? 'bg-green-500' : 'bg-yellow-500'
+            dashboardData.syncStatus?.status === 'success' ? 'bg-emerald-500' : 'bg-yellow-500'
           ]"></div>
-          <span class="text-slate-dark-400">
+          <span class="text-slate-400 font-medium">
             {{ dashboardData.syncStatus?.status === 'success' ? 'Connected' : 'Sample Data' }}
           </span>
         </div>
@@ -16,85 +15,98 @@
       <button 
         @click="refreshData" 
         :disabled="loading"
-        class="px-3 py-1 bg-cyber-500/20 text-cyber-400 rounded-lg hover:bg-cyber-500/30 transition-colors text-sm"
+        class="px-3 py-1.5 bg-cyan-500/10 text-cyan-400 rounded-lg hover:bg-cyan-500/20 transition-colors text-sm border border-cyan-500/30 font-medium"
       >
-        <i class="fas fa-sync-alt mr-2" :class="{ 'animate-spin': loading }"></i>
+        <i class="fas fa-sync-alt mr-1.5 text-xs" :class="{ 'animate-spin': loading }"></i>
         Refresh
       </button>
     </div>
     
     <!-- Configuration Notice -->
-    <div v-if="!isConfigured" class="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+    <div v-if="!isConfigured" class="mb-5 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
       <div class="flex items-start gap-3">
-        <i class="fas fa-exclamation-triangle text-yellow-500 mt-1"></i>
+        <i class="fas fa-exclamation-triangle text-yellow-500 mt-0.5"></i>
         <div>
-          <div class="text-sm font-medium text-yellow-500">Tailscale API Not Configured</div>
-          <div class="text-xs text-slate-dark-400 mt-1">
+          <div class="text-sm font-semibold text-yellow-500">Tailscale API Not Configured</div>
+          <div class="text-xs text-slate-400 mt-1">
             To get live data, configure TAILSCALE_API_KEY in your backend .env file
           </div>
         </div>
       </div>
     </div>
     
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="stat-card">
-        <div class="flex items-center justify-between">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+      <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-4 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group relative overflow-hidden transform scale-90 origin-top-left">
+        <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <div class="flex items-center justify-between relative z-10">
           <div>
-            <div class="stat-value">{{ dashboardData.deviceStats?.totalDevices || 0 }}</div>
-            <div class="stat-label">Total Devices</div>
+            <div class="text-2xl font-bold text-slate-100">{{ dashboardData.deviceStats?.totalDevices || 0 }}</div>
+            <div class="text-xs text-slate-400 mt-1 font-medium uppercase tracking-wider">Total Devices</div>
           </div>
-          <i class="fas fa-server text-cyber-500 text-3xl opacity-20"></i>
+          <i class="fas fa-server text-cyan-500 text-2xl opacity-20 group-hover:opacity-40 transition-opacity"></i>
         </div>
       </div>
 
-      <div class="stat-card">
-        <div class="flex items-center justify-between">
+      <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-4 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/20 transition-all duration-300 group relative overflow-hidden transform scale-90 origin-top-left">
+        <div class="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/10 to-emerald-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <div class="flex items-center justify-between relative z-10">
           <div>
-            <div class="stat-value text-green-400">{{ dashboardData.deviceStats?.onlineDevices || 0 }}</div>
-            <div class="stat-label">Online Now</div>
+            <div class="text-2xl font-bold text-emerald-400">{{ dashboardData.deviceStats?.onlineDevices || 0 }}</div>
+            <div class="text-xs text-slate-400 mt-1 font-medium uppercase tracking-wider">Online Now</div>
           </div>
-          <i class="fas fa-wifi text-neon-green text-3xl opacity-20"></i>
+          <i class="fas fa-wifi text-emerald-500 text-2xl opacity-20 group-hover:opacity-40 transition-opacity"></i>
         </div>
       </div>
 
-      <div class="stat-card">
-        <div class="flex items-center justify-between">
+      <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-4 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-red-500/50 hover:shadow-lg hover:shadow-red-500/20 transition-all duration-300 group relative overflow-hidden transform scale-90 origin-top-left">
+        <div class="absolute inset-0 bg-gradient-to-r from-red-500/0 via-red-500/10 to-red-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <div class="flex items-center justify-between relative z-10">
           <div>
-            <div class="stat-value text-red-400">{{ dashboardData.deviceStats?.criticalRisk || 0 }}</div>
-            <div class="stat-label">Critical Risk</div>
+            <div class="text-2xl font-bold text-red-400">{{ dashboardData.deviceStats?.criticalRisk || 0 }}</div>
+            <div class="text-xs text-slate-400 mt-1 font-medium uppercase tracking-wider">Critical Risk</div>
           </div>
-          <i class="fas fa-exclamation-triangle text-neon-red text-3xl opacity-20"></i>
+          <i class="fas fa-exclamation-triangle text-red-500 text-2xl opacity-20 group-hover:opacity-40 transition-opacity"></i>
         </div>
       </div>
 
-      <div class="stat-card">
-        <div class="flex items-center justify-between">
+      <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-4 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300 group relative overflow-hidden transform scale-90 origin-top-left">
+        <div class="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <div class="flex items-center justify-between relative z-10">
           <div>
-            <div class="stat-value">{{ dashboardData.geoDistribution?.length || 0 }}</div>
-            <div class="stat-label">Countries</div>
+            <div class="text-2xl font-bold text-purple-400">{{ dashboardData.geoDistribution?.length || 0 }}</div>
+            <div class="text-xs text-slate-400 mt-1 font-medium uppercase tracking-wider">Countries</div>
           </div>
-          <i class="fas fa-globe text-neon-purple text-3xl opacity-20"></i>
+          <i class="fas fa-globe text-purple-500 text-2xl opacity-20 group-hover:opacity-40 transition-opacity"></i>
         </div>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-      <div class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-        <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-2">High Risk Devices</div>
-        <div class="text-2xl font-bold text-neon-orange">{{ dashboardData.deviceStats?.highRisk || 0 }}</div>
-        <div class="text-xs text-slate-dark-500 mt-1">Require attention</div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-4 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-orange-500/50 hover:shadow-lg hover:shadow-orange-500/20 transition-all duration-300 group relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-r from-orange-500/0 via-orange-500/10 to-orange-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <div class="relative z-10">
+          <div class="text-xs text-slate-400 uppercase tracking-wider mb-2 font-medium">High Risk Devices</div>
+          <div class="text-2xl font-bold text-orange-400">{{ dashboardData.deviceStats?.highRisk || 0 }}</div>
+          <div class="text-xs text-slate-500 mt-1">Require attention</div>
+        </div>
       </div>
 
-      <div class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-        <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-2">Offline Devices</div>
-        <div class="text-2xl font-bold text-slate-dark-400">{{ dashboardData.deviceStats?.offlineDevices || 0 }}</div>
-        <div class="text-xs text-slate-dark-500 mt-1">Not connected</div>
+      <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-4 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-slate-600/50 hover:shadow-lg hover:shadow-slate-500/20 transition-all duration-300 group relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-r from-slate-500/0 via-slate-500/10 to-slate-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <div class="relative z-10">
+          <div class="text-xs text-slate-400 uppercase tracking-wider mb-2 font-medium">Offline Devices</div>
+          <div class="text-2xl font-bold text-slate-400">{{ dashboardData.deviceStats?.offlineDevices || 0 }}</div>
+          <div class="text-xs text-slate-500 mt-1">Not connected</div>
+        </div>
       </div>
 
-      <div class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-        <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-2">Last Sync</div>
-        <div class="text-sm font-bold text-cyber-400">{{ formatLastSync(dashboardData.syncStatus?.lastSyncTime) }}</div>
-        <div class="text-xs text-slate-dark-500 mt-1">Auto-sync enabled</div>
+      <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-4 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <div class="relative z-10">
+          <div class="text-xs text-slate-400 uppercase tracking-wider mb-2 font-medium">Last Sync</div>
+          <div class="text-sm font-bold text-cyan-400">{{ formatLastSync(dashboardData.syncStatus?.lastSyncTime) }}</div>
+          <div class="text-xs text-slate-500 mt-1">Auto-sync enabled</div>
+        </div>
       </div>
     </div>
 

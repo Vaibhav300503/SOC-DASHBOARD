@@ -99,6 +99,74 @@
       </div>
     </div>
 
+    <!-- Dropdown Menu Portal (rendered at body level to avoid overflow issues) -->
+    <Teleport to="body">
+      <Transition
+        name="glassmorphic-popup"
+        @enter="onPopupEnter"
+        @leave="onPopupLeave"
+      >
+        <div v-if="activeMenuId !== null" key="popup-container" class="fixed inset-0 pointer-events-none" style="z-index: 99998;">
+          <!-- Backdrop with blur effect -->
+          <div 
+            class="absolute inset-0 bg-black/20 backdrop-blur-sm pointer-events-auto"
+            @click="closeDropdown"
+          ></div>
+          
+          <!-- Glassmorphic Dropdown Menu -->
+          <div 
+            ref="dropdownRef"
+            class="absolute min-w-56 overflow-hidden rounded-2xl shadow-2xl pointer-events-auto"
+            :style="dropdownStyle"
+            @click.stop
+          >
+            <!-- Glassmorphic background with multiple layers -->
+            <div class="absolute inset-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/20"></div>
+            <div class="absolute inset-0 bg-gradient-to-b from-slate-dark-700/40 to-slate-dark-800/60 rounded-2xl"></div>
+            
+            <!-- Content with relative positioning -->
+            <div class="relative divide-y divide-white/10">
+              <button 
+                @click="executeAction('block')" 
+                class="w-full text-left px-5 py-4 text-sm hover:bg-white/10 flex items-center gap-3 transition-all duration-200 text-slate-dark-100 group rounded-t-xl"
+              >
+                <i class="fas fa-ban text-red-400 w-4 group-hover:scale-110 transition-transform duration-200"></i>
+                <span class="group-hover:translate-x-0.5 transition-transform duration-200">Block IP</span>
+              </button>
+              <button 
+                @click="executeAction('alert')" 
+                class="w-full text-left px-5 py-4 text-sm hover:bg-white/10 flex items-center gap-3 transition-all duration-200 text-slate-dark-100 group"
+              >
+                <i class="fas fa-exclamation-triangle text-orange-400 w-4 group-hover:scale-110 transition-transform duration-200"></i>
+                <span class="group-hover:translate-x-0.5 transition-transform duration-200">Create Alert</span>
+              </button>
+              <button 
+                @click="executeAction('investigate')" 
+                class="w-full text-left px-5 py-4 text-sm hover:bg-white/10 flex items-center gap-3 transition-all duration-200 text-slate-dark-100 group"
+              >
+                <i class="fas fa-search text-yellow-400 w-4 group-hover:scale-110 transition-transform duration-200"></i>
+                <span class="group-hover:translate-x-0.5 transition-transform duration-200">Investigate</span>
+              </button>
+              <button 
+                @click="executeAction('export')" 
+                class="w-full text-left px-5 py-4 text-sm hover:bg-white/10 flex items-center gap-3 transition-all duration-200 text-slate-dark-100 group"
+              >
+                <i class="fas fa-download text-blue-400 w-4 group-hover:scale-110 transition-transform duration-200"></i>
+                <span class="group-hover:translate-x-0.5 transition-transform duration-200">Export Log</span>
+              </button>
+              <button 
+                @click="executeAction('details')" 
+                class="w-full text-left px-5 py-4 text-sm hover:bg-white/10 flex items-center gap-3 transition-all duration-200 text-slate-dark-100 group rounded-b-xl"
+              >
+                <i class="fas fa-info-circle text-cyan-400 w-4 group-hover:scale-110 transition-transform duration-200"></i>
+                <span class="group-hover:translate-x-0.5 transition-transform duration-200">View Details</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- Main Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <!-- Left: Logs Table -->
@@ -106,22 +174,30 @@
         <div class="card-glass p-6 rounded-xl border-t border-t-accent-primary/10">
           <div class="flex items-center justify-between mb-6">
             <h3 class="text-lg font-black title-gradient">{{ selectedSeverity }} Severity Logs</h3>
-            <span class="px-2 py-0.5 bg-accent-primary/10 text-accent-primary text-[10px] font-bold rounded">{{ filteredLogs.length }} TOTAL</span>
+            <span class="px-2 py-0.5 bg-accent-primary/10 text-accent-primary text-[10px] font-bold rounded">{{ displayLogs.length }} TOTAL</span>
           </div>
 
-          <div class="overflow-x-auto">
-            <table class="table-cyber">
+          <div class="overflow-x-auto overflow-y-visible">
+            <table class="table-cyber w-full">
               <thead>
                 <tr>
                   <th>Timestamp</th>
                   <th>Source IP</th>
                   <th>Destination</th>
                   <th>Log Type</th>
-                  <th>Action</th>
+                  <th class="w-20">Action</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="log in filteredLogs.slice(0, 20)" :key="log.id">
+                <tr v-if="displayLogs.length === 0">
+                  <td colspan="5" class="text-center py-12">
+                    <div class="text-slate-500">
+                      <i class="fas fa-inbox text-4xl mb-3 block opacity-50"></i>
+                      <p class="text-sm">Data will be updated soon</p>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-else v-for="log in displayLogs.slice(0, 20)" :key="log.id">
                   <td class="text-slate-dark-400 text-sm">{{ formatTime(log.timestamp) }}</td>
                   <td>
                     <code class="text-cyber-400 font-mono text-sm">{{ log.source_ip }}</code>
@@ -132,36 +208,14 @@
                       {{ log.log_type }}
                     </span>
                   </td>
-                  <td>
-                    <div class="relative" @click.stop>
-                      <button @click="toggleActionMenu(log.id)" class="text-cyber-400 hover:text-cyber-300">
-                        <i class="fas fa-chevron-right"></i>
-                      </button>
-                      
-                      <!-- Dropdown Menu -->
-                      <div v-if="showActionMenu === log.id" class="absolute right-0 top-6 bg-slate-dark-800 border border-slate-dark-700 rounded-lg shadow-lg z-50 min-w-48">
-                        <button @click="blockIP(log)" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-dark-700 flex items-center gap-2">
-                          <i class="fas fa-ban text-red-400"></i>
-                          <span>Block IP</span>
-                        </button>
-                        <button @click="createAlert(log)" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-dark-700 flex items-center gap-2">
-                          <i class="fas fa-exclamation-triangle text-orange-400"></i>
-                          <span>Create Alert</span>
-                        </button>
-                        <button @click="investigateLog(log)" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-dark-700 flex items-center gap-2">
-                          <i class="fas fa-search text-yellow-400"></i>
-                          <span>Investigate</span>
-                        </button>
-                        <button @click="exportLog(log)" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-dark-700 flex items-center gap-2">
-                          <i class="fas fa-download text-blue-400"></i>
-                          <span>Export Log</span>
-                        </button>
-                        <button @click="showLogDetails(log)" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-dark-700 flex items-center gap-2">
-                          <i class="fas fa-info-circle text-gray-400"></i>
-                          <span>View Details</span>
-                        </button>
-                      </div>
-                    </div>
+                  <td class="relative">
+                    <button 
+                      @click.stop="openDropdown($event, log)"
+                      class="text-cyber-400 hover:text-cyber-300 p-2 rounded transition-colors"
+                      :class="{ 'text-cyber-300 bg-slate-dark-700': activeMenuId === log.id }"
+                    >
+                      <i class="fas fa-ellipsis-v"></i>
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -198,7 +252,11 @@
         <div class="card-glass p-6 rounded-xl border-t border-t-accent-cyan/10">
           <h3 class="text-lg font-black title-gradient mb-6">Top Source IPs</h3>
           <div class="space-y-3">
-            <div v-for="(ip, idx) in topIPsForSeverity.slice(0, 5)" :key="idx" class="bg-slate-dark-900/50 rounded-lg p-3 border border-slate-dark-700/50">
+            <div v-if="topIPsForSeverity.length === 0" class="text-center py-8 text-slate-500">
+              <i class="fas fa-network-wired text-3xl mb-3 block opacity-50"></i>
+              <p class="text-sm">Data will be updated soon</p>
+            </div>
+            <div v-else v-for="(ip, idx) in topIPsForSeverity.slice(0, 5)" :key="idx" class="bg-slate-dark-900/50 rounded-lg p-3 border border-slate-dark-700/50">
               <div class="flex items-center justify-between">
                 <code class="text-cyber-400 font-mono text-sm">{{ ip.ip }}</code>
                 <span class="font-bold text-slate-dark-50">{{ ip.count }}</span>
@@ -213,7 +271,11 @@
     <div class="card-glass p-6 rounded-xl border-t border-t-accent-primary/10">
       <h3 class="text-lg font-black title-gradient mb-6">Detailed Events</h3>
       <div class="space-y-4">
-        <div v-for="log in filteredLogs.slice(0, 5)" :key="log.id" class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
+        <div v-if="displayLogs.length === 0" class="text-center py-12 text-slate-500">
+          <i class="fas fa-list-alt text-4xl mb-3 block opacity-50"></i>
+          <p class="text-sm">Data will be updated soon</p>
+        </div>
+        <div v-else v-for="log in displayLogs.slice(0, 5)" :key="log.id" class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
           <div class="flex items-start justify-between mb-3">
             <div>
               <p class="text-sm font-semibold text-slate-dark-50">{{ log.log_type }} - {{ log.endpoint }}</p>
@@ -229,16 +291,16 @@
           <div class="grid grid-cols-3 gap-4 text-xs text-slate-dark-400 pt-3 border-t border-slate-dark-700/50">
             <div>
               <span class="text-slate-dark-500">Protocol:</span>
-              <span class="text-slate-dark-300 ml-2">{{ log.raw.protocol }}</span>
+              <span class="text-slate-dark-300 ml-2">{{ log.raw?.protocol || log.protocol || 'N/A' }}</span>
             </div>
             <div>
               <span class="text-slate-dark-500">Port:</span>
-              <span class="text-slate-dark-300 ml-2">{{ log.raw.port }}</span>
+              <span class="text-slate-dark-300 ml-2">{{ log.raw?.port || log.port || 'N/A' }}</span>
             </div>
             <div>
               <span class="text-slate-dark-500">Action:</span>
-              <span :class="log.raw.action === 'ALLOW' ? 'text-neon-green' : 'text-neon-red'" class="ml-2">
-                {{ log.raw.action }}
+              <span :class="(log.raw?.action || log.action) === 'ALLOW' ? 'text-neon-green' : 'text-neon-red'" class="ml-2">
+                {{ log.raw?.action || log.action || 'N/A' }}
               </span>
             </div>
           </div>
@@ -247,112 +309,166 @@
     </div>
 
     <!-- Log Details Modal -->
-    <div v-if="showLogModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div class="bg-slate-dark-800 border border-slate-dark-600 rounded-lg p-6 max-w-4xl max-h-[80vh] overflow-y-auto mx-4">
-        <div class="flex items-center justify-between mb-6">
-          <h3 class="text-xl font-semibold text-slate-dark-50">Log Details</h3>
-          <button @click="closeLogModal" class="text-slate-dark-400 hover:text-slate-dark-300">
-            <i class="fas fa-times text-xl"></i>
-          </button>
-        </div>
-        
-        <div v-if="selectedLogDetails" class="space-y-6">
-          <!-- Basic Information -->
-          <div class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-            <h4 class="text-lg font-medium text-cyber-400 mb-4">Basic Information</h4>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <span class="text-sm text-slate-dark-500">ID:</span>
-                <span class="text-sm text-slate-dark-300 ml-2 font-mono">{{ selectedLogDetails.basic.id }}</span>
-              </div>
-              <div>
-                <span class="text-sm text-slate-dark-500">Timestamp:</span>
-                <span class="text-sm text-slate-dark-300 ml-2">{{ selectedLogDetails.basic.timestamp }}</span>
-              </div>
-              <div>
-                <span class="text-sm text-slate-dark-500">Severity:</span>
-                <span :class="['badge-' + selectedLogDetails.basic.severity.toLowerCase(), 'ml-2']">
-                  {{ selectedLogDetails.basic.severity }}
-                </span>
-              </div>
-              <div>
-                <span class="text-sm text-slate-dark-500">Log Type:</span>
-                <span class="text-sm text-slate-dark-300 ml-2">{{ selectedLogDetails.basic.logType }}</span>
-              </div>
-              <div class="md:col-span-2">
-                <span class="text-sm text-slate-dark-500">Endpoint:</span>
-                <span class="text-sm text-slate-dark-300 ml-2">{{ selectedLogDetails.basic.endpoint }}</span>
-              </div>
-            </div>
-          </div>
+    <Teleport to="body">
+      <Transition
+        name="modal-glassmorphic"
+        @enter="onModalEnter"
+        @leave="onModalLeave"
+      >
+        <div v-if="showLogModal" class="fixed inset-0 flex items-center justify-center z-[99999] p-4">
+          <!-- Backdrop with enhanced blur -->
+          <div 
+            class="absolute inset-0 bg-black/40 backdrop-blur-md"
+            @click="closeLogModal"
+          ></div>
           
-          <!-- Network Information -->
-          <div class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-            <h4 class="text-lg font-medium text-cyber-400 mb-4">Network Information</h4>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <span class="text-sm text-slate-dark-500">Source IP:</span>
-                <code class="text-sm text-cyber-400 ml-2 font-mono">{{ selectedLogDetails.network.sourceIP }}</code>
+          <!-- Glassmorphic Modal Container -->
+          <div class="relative w-full max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl shadow-2xl transform transition-all duration-300 ease-out">
+            <!-- Multiple glassmorphic layers for depth -->
+            <div class="absolute inset-0 bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-xl rounded-2xl"></div>
+            <div class="absolute inset-0 bg-gradient-to-b from-slate-dark-700/60 to-slate-dark-800/80 rounded-2xl"></div>
+            <div class="absolute inset-0 border border-white/20 rounded-2xl"></div>
+            
+            <!-- Content with relative positioning and scrolling -->
+            <div class="relative bg-slate-dark-800/20 backdrop-blur-sm rounded-2xl p-6 max-h-[85vh] overflow-y-auto custom-scrollbar">
+              <!-- Modal Header -->
+              <div class="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
+                <h3 class="text-xl font-bold text-slate-dark-50 flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-cyber-400/20 flex items-center justify-center">
+                    <i class="fas fa-info-circle text-cyber-400 text-sm"></i>
+                  </div>
+                  Log Details
+                </h3>
+                <button 
+                  @click="closeLogModal" 
+                  class="text-slate-dark-400 hover:text-slate-dark-300 p-2 rounded-lg hover:bg-white/10 transition-all duration-200 group"
+                >
+                  <i class="fas fa-times text-lg group-hover:scale-110 transition-transform duration-200"></i>
+                </button>
               </div>
-              <div>
-                <span class="text-sm text-slate-dark-500">Destination IP:</span>
-                <code class="text-sm text-cyber-400 ml-2 font-mono">{{ selectedLogDetails.network.destinationIP }}</code>
+              
+              <div v-if="selectedLogDetails" class="space-y-6">
+                <!-- Basic Information -->
+                <div class="glassmorphic-card rounded-xl p-5 border border-white/10 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm">
+                  <h4 class="text-lg font-bold text-cyber-400 mb-4 flex items-center gap-2">
+                    <i class="fas fa-database text-sm"></i>
+                    Basic Information
+                  </h4>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-slate-dark-900/30 rounded-lg p-3 border border-slate-dark-700/30">
+                      <span class="text-xs text-slate-dark-500 uppercase tracking-wide font-medium">ID</span>
+                      <div class="text-sm text-slate-dark-300 mt-1 font-mono">{{ selectedLogDetails.basic.id }}</div>
+                    </div>
+                    <div class="bg-slate-dark-900/30 rounded-lg p-3 border border-slate-dark-700/30">
+                      <span class="text-xs text-slate-dark-500 uppercase tracking-wide font-medium">Timestamp</span>
+                      <div class="text-sm text-slate-dark-300 mt-1">{{ selectedLogDetails.basic.timestamp }}</div>
+                    </div>
+                    <div class="bg-slate-dark-900/30 rounded-lg p-3 border border-slate-dark-700/30">
+                      <span class="text-xs text-slate-dark-500 uppercase tracking-wide font-medium">Severity</span>
+                      <div class="mt-1">
+                        <span :class="['badge-' + selectedLogDetails.basic.severity.toLowerCase(), 'text-xs px-2 py-1 rounded-full font-medium']">
+                          {{ selectedLogDetails.basic.severity }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="bg-slate-dark-900/30 rounded-lg p-3 border border-slate-dark-700/30">
+                      <span class="text-xs text-slate-dark-500 uppercase tracking-wide font-medium">Log Type</span>
+                      <div class="text-sm text-slate-dark-300 mt-1">{{ selectedLogDetails.basic.logType }}</div>
+                    </div>
+                    <div class="md:col-span-2 bg-slate-dark-900/30 rounded-lg p-3 border border-slate-dark-700/30">
+                      <span class="text-xs text-slate-dark-500 uppercase tracking-wide font-medium">Endpoint</span>
+                      <div class="text-sm text-slate-dark-300 mt-1 break-all">{{ selectedLogDetails.basic.endpoint }}</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Network Information -->
+                <div class="glassmorphic-card rounded-xl p-5 border border-white/10 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm">
+                  <h4 class="text-lg font-bold text-cyber-400 mb-4 flex items-center gap-2">
+                    <i class="fas fa-network-wired text-sm"></i>
+                    Network Information
+                  </h4>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-slate-dark-900/30 rounded-lg p-3 border border-slate-dark-700/30">
+                      <span class="text-xs text-slate-dark-500 uppercase tracking-wide font-medium">Source IP</span>
+                      <code class="text-sm text-cyber-400 mt-1 font-mono block">{{ selectedLogDetails.network.sourceIP }}</code>
+                    </div>
+                    <div class="bg-slate-dark-900/30 rounded-lg p-3 border border-slate-dark-700/30">
+                      <span class="text-xs text-slate-dark-500 uppercase tracking-wide font-medium">Destination IP</span>
+                      <code class="text-sm text-cyber-400 mt-1 font-mono block">{{ selectedLogDetails.network.destinationIP }}</code>
+                    </div>
+                    <div class="bg-slate-dark-900/30 rounded-lg p-3 border border-slate-dark-700/30">
+                      <span class="text-xs text-slate-dark-500 uppercase tracking-wide font-medium">Protocol</span>
+                      <div class="text-sm text-slate-dark-300 mt-1">{{ selectedLogDetails.network.protocol }}</div>
+                    </div>
+                    <div class="bg-slate-dark-900/30 rounded-lg p-3 border border-slate-dark-700/30">
+                      <span class="text-xs text-slate-dark-500 uppercase tracking-wide font-medium">Port</span>
+                      <div class="text-sm text-slate-dark-300 mt-1">{{ selectedLogDetails.network.port }}</div>
+                    </div>
+                    <div class="md:col-span-2 bg-slate-dark-900/30 rounded-lg p-3 border border-slate-dark-700/30">
+                      <span class="text-xs text-slate-dark-500 uppercase tracking-wide font-medium">Action</span>
+                      <div class="mt-1">
+                        <span :class="selectedLogDetails.network.action === 'ALLOW' ? 'text-neon-green' : 'text-neon-red'" class="font-medium text-sm">
+                          {{ selectedLogDetails.network.action }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Additional Details -->
+                <div class="glassmorphic-card rounded-xl p-5 border border-white/10 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm">
+                  <h4 class="text-lg font-bold text-cyber-400 mb-4 flex items-center gap-2">
+                    <i class="fas fa-list-alt text-sm"></i>
+                    Additional Details
+                  </h4>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2 bg-slate-dark-900/30 rounded-lg p-3 border border-slate-dark-700/30">
+                      <span class="text-xs text-slate-dark-500 uppercase tracking-wide font-medium">Description</span>
+                      <p class="text-sm text-slate-dark-300 mt-1">{{ selectedLogDetails.additional.description }}</p>
+                    </div>
+                    <div class="md:col-span-2 bg-slate-dark-900/30 rounded-lg p-3 border border-slate-dark-700/30">
+                      <span class="text-xs text-slate-dark-500 uppercase tracking-wide font-medium">User Agent</span>
+                      <p class="text-sm text-slate-dark-300 mt-1 font-mono break-all">{{ selectedLogDetails.additional.userAgent }}</p>
+                    </div>
+                    <div class="bg-slate-dark-900/30 rounded-lg p-3 border border-slate-dark-700/30">
+                      <span class="text-xs text-slate-dark-500 uppercase tracking-wide font-medium">Bytes</span>
+                      <div class="text-sm text-slate-dark-300 mt-1">{{ selectedLogDetails.additional.bytes }}</div>
+                    </div>
+                    <div class="bg-slate-dark-900/30 rounded-lg p-3 border border-slate-dark-700/30">
+                      <span class="text-xs text-slate-dark-500 uppercase tracking-wide font-medium">Packets</span>
+                      <div class="text-sm text-slate-dark-300 mt-1">{{ selectedLogDetails.additional.packets }}</div>
+                    </div>
+                    <div class="md:col-span-2 bg-slate-dark-900/30 rounded-lg p-3 border border-slate-dark-700/30">
+                      <span class="text-xs text-slate-dark-500 uppercase tracking-wide font-medium">Duration</span>
+                      <div class="text-sm text-slate-dark-300 mt-1">{{ selectedLogDetails.additional.duration }}</div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <span class="text-sm text-slate-dark-500">Protocol:</span>
-                <span class="text-sm text-slate-dark-300 ml-2">{{ selectedLogDetails.network.protocol }}</span>
-              </div>
-              <div>
-                <span class="text-sm text-slate-dark-500">Port:</span>
-                <span class="text-sm text-slate-dark-300 ml-2">{{ selectedLogDetails.network.port }}</span>
-              </div>
-              <div class="md:col-span-2">
-                <span class="text-sm text-slate-dark-500">Action:</span>
-                <span :class="selectedLogDetails.network.action === 'ALLOW' ? 'text-neon-green' : 'text-neon-red'" class="ml-2 font-medium">
-                  {{ selectedLogDetails.network.action }}
-                </span>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Additional Details -->
-          <div class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-            <h4 class="text-lg font-medium text-cyber-400 mb-4">Additional Details</h4>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div class="md:col-span-2">
-                <span class="text-sm text-slate-dark-500">Description:</span>
-                <p class="text-sm text-slate-dark-300 mt-1">{{ selectedLogDetails.additional.description }}</p>
-              </div>
-              <div class="md:col-span-2">
-                <span class="text-sm text-slate-dark-500">User Agent:</span>
-                <p class="text-sm text-slate-dark-300 mt-1 font-mono break-all">{{ selectedLogDetails.additional.userAgent }}</p>
-              </div>
-              <div>
-                <span class="text-sm text-slate-dark-500">Bytes:</span>
-                <span class="text-sm text-slate-dark-300 ml-2">{{ selectedLogDetails.additional.bytes }}</span>
-              </div>
-              <div>
-                <span class="text-sm text-slate-dark-500">Packets:</span>
-                <span class="text-sm text-slate-dark-300 ml-2">{{ selectedLogDetails.additional.packets }}</span>
-              </div>
-              <div>
-                <span class="text-sm text-slate-dark-500">Duration:</span>
-                <span class="text-sm text-slate-dark-300 ml-2">{{ selectedLogDetails.additional.duration }}</span>
+              
+              <!-- Action Buttons -->
+              <div class="flex justify-end gap-3 mt-8 pt-6 border-t border-white/10">
+                <button 
+                  @click="copyLogDetails" 
+                  class="btn-cyber-outline flex items-center gap-2 px-4 py-2 rounded-lg border border-cyber-400/30 text-cyber-400 hover:bg-cyber-400/10 transition-all duration-200 group"
+                >
+                  <i class="fas fa-copy group-hover:scale-110 transition-transform duration-200"></i>
+                  Copy Details
+                </button>
+                <button 
+                  @click="exportLogDetails" 
+                  class="btn-cyber flex items-center gap-2 px-4 py-2 rounded-lg bg-cyber-400/20 border border-cyber-400/50 text-cyber-400 hover:bg-cyber-400/30 transition-all duration-200 group"
+                >
+                  <i class="fas fa-download group-hover:scale-110 transition-transform duration-200"></i>
+                  Export
+                </button>
               </div>
             </div>
           </div>
         </div>
-        
-        <div class="flex justify-end gap-3 mt-6">
-          <button @click="copyLogDetails" class="btn-cyber-outline">
-            <i class="fas fa-copy mr-2"></i>Copy Details
-          </button>
-          <button @click="exportLogDetails" class="btn-cyber">
-            <i class="fas fa-download mr-2"></i>Export
-          </button>
-        </div>
-      </div>
-    </div>
+      </Transition>
+    </Teleport>
 
     <!-- Loading Overlay -->
     <div v-if="isLoading" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -372,7 +488,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useAPIStore } from '../stores/apiStore'
 import { useAuthStore } from '../stores/authStore'
 import { useToast } from '../composables/useToast.js'
@@ -385,80 +501,253 @@ const selectedSeverity = ref('Critical')
 const filterLogType = ref('')
 const filterTimeRange = ref('24h')
 const filterSourceIP = ref('')
-const showActionMenu = ref(null)
+const activeMenuId = ref(null)
+const activeLog = ref(null)
+const dropdownRef = ref(null)
+const dropdownStyle = ref({})
 const isLoading = ref(false)
 const loadingAction = ref('')
 const showLogModal = ref(false)
 const selectedLogDetails = ref(null)
 
+// Severity-specific logs fetched from backend
+const severityLogs = ref([])
+
 onMounted(async () => {
+  await apiStore.fetchDashboardStats()
   await apiStore.fetchRecentLogs(1000)
+  // Also fetch severity-specific logs for better accuracy
+  await fetchSeverityLogs(selectedSeverity.value)
+})
+
+// Fetch logs for a specific severity from backend
+const fetchSeverityLogs = async (severity) => {
+  try {
+    const data = await apiStore.fetchLogsBySeverity(severity, 500)
+    if (data && data.data) {
+      severityLogs.value = data.data
+    }
+  } catch (error) {
+    console.error('Error fetching severity logs:', error)
+  }
+}
+
+// Watch for severity changes and fetch new logs
+watch(selectedSeverity, async (newSeverity) => {
+  await fetchSeverityLogs(newSeverity)
 })
 
 const severities = computed(() => {
-  const criticalCount = apiStore.logs.filter(l => l.severity === 'Critical').length
-  const highCount = apiStore.logs.filter(l => l.severity === 'High').length
-  const mediumCount = apiStore.logs.filter(l => l.severity === 'Medium').length
-  const lowCount = apiStore.logs.filter(l => l.severity === 'Low').length
+  // Use backend severity breakdown like Dashboard does
+  const getCriticalCount = () => apiStore.severityBreakdown.find(s => s._id === 'Critical')?.count || 0
+  const getHighCount = () => apiStore.severityBreakdown.find(s => s._id === 'High')?.count || 0
+  const getMediumCount = () => apiStore.severityBreakdown.find(s => s._id === 'Medium')?.count || 0
+  const getLowCount = () => apiStore.severityBreakdown.find(s => s._id === 'Low')?.count || 0
   
   return [
-    { name: 'Critical', count: criticalCount, icon: 'fas fa-exclamation-circle', color: '#ff0055' },
-    { name: 'High', count: highCount, icon: 'fas fa-alert', color: '#ff6b35' },
-    { name: 'Medium', count: mediumCount, icon: 'fas fa-info-circle', color: '#ffd700' },
-    { name: 'Low', count: lowCount, icon: 'fas fa-check-circle', color: '#00ff88' },
+    { name: 'Critical', count: getCriticalCount(), icon: 'fas fa-exclamation-circle', color: '#ff0055' },
+    { name: 'High', count: getHighCount(), icon: 'fas fa-alert', color: '#ff6b35' },
+    { name: 'Medium', count: getMediumCount(), icon: 'fas fa-info-circle', color: '#ffd700' },
+    { name: 'Low', count: getLowCount(), icon: 'fas fa-check-circle', color: '#00ff88' },
   ]
 })
 
+// Helper function to normalize severity for comparison
+const normalizeSeverity = (severity) => {
+  if (!severity) return 'Low'
+  const s = String(severity).toLowerCase().trim()
+  if (s.includes('critical')) return 'Critical'
+  if (s.includes('high')) return 'High'
+  if (s.includes('medium')) return 'Medium'
+  return 'Low'
+}
+
 const filteredLogs = computed(() => {
-  return apiStore.logs.filter(log => {
-    if (log.severity !== selectedSeverity.value) return false
+  // Prefer severity-specific logs from backend, fall back to general logs
+  const logs = severityLogs.value.length > 0 ? severityLogs.value : (apiStore.logs || [])
+  return logs.filter(log => {
+    if (!log) return false
+    // Normalize severity for comparison to match backend aggregation
+    const logSeverity = normalizeSeverity(log.severity)
+    if (logSeverity !== selectedSeverity.value) return false
     if (filterLogType.value && log.log_type !== filterLogType.value) return false
     if (filterSourceIP.value && !log.source_ip?.includes(filterSourceIP.value)) return false
     return true
   })
 })
 
+// For SOC trustworthiness: Show ALL logs for the selected severity, not filtered by other criteria
+const allLogsForSeverity = computed(() => {
+  // Prefer severity-specific logs from backend, fall back to general logs
+  const logs = severityLogs.value.length > 0 ? severityLogs.value : (apiStore.logs || [])
+  return logs.filter(log => {
+    if (!log) return false
+    // Normalize severity for comparison to match backend aggregation
+    const logSeverity = normalizeSeverity(log.severity)
+    if (logSeverity !== selectedSeverity.value) return false
+    return true
+  })
+})
+
+// Use this for display to match severity counts
+const displayLogs = computed(() => {
+  // If no additional filters are applied, show all logs for the severity
+  if (!filterLogType.value && !filterSourceIP.value) {
+    return allLogsForSeverity.value
+  }
+  // Otherwise show filtered logs
+  return filteredLogs.value
+})
+
 const severityDistribution = computed(() => {
-  const criticalCount = apiStore.logs.filter(l => l.severity === 'Critical').length
-  const highCount = apiStore.logs.filter(l => l.severity === 'High').length
-  const mediumCount = apiStore.logs.filter(l => l.severity === 'Medium').length
-  const lowCount = apiStore.logs.filter(l => l.severity === 'Low').length
+  // Use backend severity breakdown like Dashboard does
+  const getCriticalCount = () => apiStore.severityBreakdown.find(s => s._id === 'Critical')?.count || 0
+  const getHighCount = () => apiStore.severityBreakdown.find(s => s._id === 'High')?.count || 0
+  const getMediumCount = () => apiStore.severityBreakdown.find(s => s._id === 'Medium')?.count || 0
+  const getLowCount = () => apiStore.severityBreakdown.find(s => s._id === 'Low')?.count || 0
   
   return [
-    { name: 'Critical', value: criticalCount, color: '#ff0055' },
-    { name: 'High', value: highCount, color: '#ff6b35' },
-    { name: 'Medium', value: mediumCount, color: '#ffd700' },
-    { name: 'Low', value: lowCount, color: '#00ff88' },
+    { name: 'Critical', value: getCriticalCount(), color: '#ff0055' },
+    { name: 'High', value: getHighCount(), color: '#ff6b35' },
+    { name: 'Medium', value: getMediumCount(), color: '#ffd700' },
+    { name: 'Low', value: getLowCount(), color: '#00ff88' },
   ]
 })
 
-const totalLogs = computed(() => apiStore.logs.length)
+const totalLogs = computed(() => apiStore.total || 0)
 
 const topIPsForSeverity = computed(() => {
+  // First try to get IPs from the displayed logs for the selected severity
   const ips = {}
-  filteredLogs.value.forEach(log => {
-    ips[log.source_ip] = (ips[log.source_ip] || 0) + 1
+  const logs = displayLogs.value || []
+  
+  logs.forEach(log => {
+    if (log && log.source_ip && log.source_ip !== '0.0.0.0' && log.source_ip !== 'Unknown') {
+      ips[log.source_ip] = (ips[log.source_ip] || 0) + 1
+    }
   })
-  return Object.entries(ips)
+  
+  const calculatedIPs = Object.entries(ips)
     .map(([ip, count]) => ({ ip, count }))
     .sort((a, b) => b.count - a.count)
+  
+  // If we have calculated IPs from logs, use them
+  if (calculatedIPs.length > 0) {
+    return calculatedIPs
+  }
+  
+  // Fallback: Use backend's topSourceIPs if available (for overall view)
+  const backendIPs = apiStore.topSourceIPs || []
+  if (backendIPs.length > 0) {
+    return backendIPs
+      .filter(item => item._id && item._id !== '0.0.0.0' && item._id !== 'Unknown')
+      .map(item => ({ ip: item._id, count: item.count }))
+      .slice(0, 10)
+  }
+  
+  return []
 })
 
 const formatTime = (timestamp) => {
   return new Date(timestamp).toLocaleString()
 }
 
-const toggleActionMenu = (logId) => {
-  showActionMenu.value = showActionMenu.value === logId ? null : logId
+// Open dropdown and position it relative to the clicked button
+const openDropdown = (event, log) => {
+  // If clicking the same button, close the dropdown
+  if (activeMenuId.value === log.id) {
+    closeDropdown()
+    return
+  }
+  
+  // Store the log and its ID
+  activeMenuId.value = log.id
+  activeLog.value = log
+  
+  // Use nextTick to ensure dropdown is rendered before positioning
+  import.meta.env && nextTick(() => {
+    if (!dropdownRef.value) return
+    
+    // Get button position (getBoundingClientRect gives viewport-relative coords)
+    const button = event.currentTarget
+    const rect = button.getBoundingClientRect()
+    
+    // Get actual dropdown dimensions
+    const dropdownHeight = dropdownRef.value.offsetHeight || 280
+    const dropdownWidth = dropdownRef.value.offsetWidth || 224
+    const gap = 8
+    
+    // Calculate horizontal position - align right side of dropdown with button right side
+    let left = rect.right - dropdownWidth
+    
+    // Constrain horizontally
+    const minLeft = 8
+    const maxLeft = window.innerWidth - dropdownWidth - 8
+    left = Math.max(minLeft, Math.min(left, maxLeft))
+    
+    // Calculate vertical position - below button by default
+    let top = rect.bottom + gap
+    
+    // If dropdown would go off bottom of screen, position above button instead
+    if (top + dropdownHeight > window.innerHeight) {
+      top = rect.top - dropdownHeight - gap
+    }
+    
+    // Ensure top doesn't go negative
+    top = Math.max(8, top)
+    
+    dropdownStyle.value = {
+      top: `${top}px`,
+      left: `${left}px`,
+      zIndex: 99999
+    }
+  })
 }
 
-// Close menu when clicking outside
-document.addEventListener('click', () => {
-  showActionMenu.value = null
-})
+// Close dropdown
+const closeDropdown = () => {
+  activeMenuId.value = null
+  activeLog.value = null
+}
+
+// Execute action on the active log
+const executeAction = async (action) => {
+  const log = activeLog.value
+  if (!log) return
+  
+  // Close dropdown immediately
+  closeDropdown()
+  
+  // Route to appropriate action handler
+  switch (action) {
+    case 'block':
+      await blockIP(log)
+      break
+    case 'alert':
+      await createAlert(log)
+      break
+    case 'investigate':
+      await investigateLog(log)
+      break
+    case 'export':
+      exportLog(log)
+      break
+    case 'details':
+      showLogDetails(log)
+      break
+    default:
+      addToast(`Unknown action: ${action}`, 'warning')
+  }
+}
+
+
 
 const blockIP = async (log) => {
-  showActionMenu.value = null // Close menu first
+  if (!log || !log.source_ip) {
+    addToast('Cannot block IP: Invalid log data', 'error')
+    return
+  }
+  
   isLoading.value = true
   loadingAction.value = 'Blocking IP...'
   
@@ -468,23 +757,22 @@ const blockIP = async (log) => {
     const response = await axios.post(`${API_BASE}/ip/block`, 
       { 
         ip: log.source_ip, 
-        reason: `Manually blocked from ${log.log_type} log: ${log.endpoint}` 
+        reason: `Manually blocked from ${log.log_type} log: ${log.endpoint}`,
+        log_id: log.id,
+        severity: log.severity
       },
       { headers: { Authorization: `Bearer ${authStore.token}` } }
     )
     
-    // Check if IP was actually blocked
     if (response.data.success) {
-      addToast(`IP ${log.source_ip} blocked successfully! Reason: ${response.data.message || 'Manual block'}`, 'success')
+      addToast(`IP ${log.source_ip} blocked successfully!`, 'success')
     } else {
       addToast(`IP ${log.source_ip} was not blocked: ${response.data.message || 'Unknown reason'}`, 'warning')
     }
   } catch (error) {
-    console.error('Failed to block IP:', error)
     let errorMessage = 'Unknown error occurred'
     
     if (error.response) {
-      // Server responded with error status
       if (error.response.status === 400) {
         errorMessage = error.response.data.error || 'IP already blocked or invalid request'
       } else if (error.response.status === 401) {
@@ -497,7 +785,6 @@ const blockIP = async (log) => {
         errorMessage = error.response.data.error || `Server error (${error.response.status})`
       }
     } else if (error.request) {
-      // Network error
       errorMessage = 'Network error - please check connection'
     } else {
       errorMessage = error.message || 'Unknown error'
@@ -511,36 +798,41 @@ const blockIP = async (log) => {
 }
 
 const createAlert = async (log) => {
-  showActionMenu.value = null // Close menu first
+  if (!log || !log.source_ip) {
+    addToast('Cannot create alert: Invalid log data', 'error')
+    return
+  }
+  
   isLoading.value = true
   loadingAction.value = 'Creating alert...'
   
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api'
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3002/api'
   
   try {
-    const response = await axios.post(`${API_BASE}/alerts/rules`,
+    const title = `Security Alert: ${log.severity} ${log.log_type} Event`
+    const description = `${log.log_type} activity detected from ${log.source_ip}${log.dest_ip ? ` to ${log.dest_ip}` : ''}${log.endpoint ? ` at ${log.endpoint}` : ''}`
+    
+    const response = await axios.post(`${API_BASE}/alerts/events`,
       {
-        name: `Alert: ${log.log_type} from ${log.source_ip}`,
-        condition: `source_ip == '${log.source_ip}' AND log_type == '${log.log_type}'`,
+        title,
+        description,
         severity: log.severity,
-        description: `Manual alert for ${log.log_type} activity targeting ${log.endpoint}`,
-        enabled: true
+        source_ip: log.source_ip,
+        dest_ip: log.dest_ip,
+        log_id: log.id
       },
       { headers: { Authorization: `Bearer ${authStore.token}` } }
     )
     
-    // Check if alert was actually created
     if (response.data.success) {
-      addToast(`Alert created successfully for ${log.source_ip}! Rule: ${response.data.data?.name || 'New alert rule'}`, 'success')
+      addToast(`Alert created successfully for ${log.source_ip}!`, 'success')
     } else {
       addToast(`Alert was not created: ${response.data.message || 'Unknown reason'}`, 'warning')
     }
   } catch (error) {
-    console.error('Failed to create alert:', error)
     let errorMessage = 'Unknown error occurred'
     
     if (error.response) {
-      // Server responded with error status
       if (error.response.status === 400) {
         errorMessage = error.response.data.message || 'Invalid alert data or missing required fields'
       } else if (error.response.status === 401) {
@@ -553,7 +845,6 @@ const createAlert = async (log) => {
         errorMessage = error.response.data.message || `Server error (${error.response.status})`
       }
     } else if (error.request) {
-      // Network error
       errorMessage = 'Network error - please check connection'
     } else {
       errorMessage = error.message || 'Unknown error'
@@ -567,7 +858,6 @@ const createAlert = async (log) => {
 }
 
 const investigateLog = async (log) => {
-  showActionMenu.value = null // Close menu first
   isLoading.value = true
   loadingAction.value = 'Investigating IP...'
   
@@ -583,7 +873,6 @@ const investigateLog = async (log) => {
       })
     ])
     
-    // Verify we got valid data
     if (!whoisResponse.data.success || !geoResponse.data.success) {
       throw new Error('Investigation services returned invalid data')
     }
@@ -596,7 +885,6 @@ const investigateLog = async (log) => {
       investigationStatus: 'completed'
     }
     
-    // Download investigation report
     const jsonString = JSON.stringify(investigationData, null, 2)
     const blob = new Blob([jsonString], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -606,13 +894,11 @@ const investigateLog = async (log) => {
     linkElement.click()
     URL.revokeObjectURL(url)
     
-    addToast(`Investigation completed for ${log.source_ip}! Report downloaded successfully.`, 'success')
+    addToast(`Investigation completed for ${log.source_ip}!`, 'success')
   } catch (error) {
-    console.error('Investigation failed:', error)
     let errorMessage = 'Unknown error occurred'
     
     if (error.response) {
-      // Server responded with error status
       if (error.response.status === 400) {
         errorMessage = 'Invalid IP address or lookup failed'
       } else if (error.response.status === 401) {
@@ -625,14 +911,12 @@ const investigateLog = async (log) => {
         errorMessage = error.response.data.error || `Server error (${error.response.status})`
       }
     } else if (error.request) {
-      // Network error
       errorMessage = 'Network error - please check connection'
     } else {
       errorMessage = error.message || 'Investigation service unavailable'
     }
     
     addToast(`Investigation failed for ${log.source_ip}: ${errorMessage}`, 'error')
-    // Fallback: show basic log details
     showLogDetails(log)
   } finally {
     isLoading.value = false
@@ -641,7 +925,7 @@ const investigateLog = async (log) => {
 }
 
 const exportLog = (log) => {
-  showActionMenu.value = null // Close menu first
+  activeMenuId.value = null // Close menu first
   
   try {
     const exportData = {
@@ -669,7 +953,7 @@ const exportLog = (log) => {
 }
 
 const showLogDetails = (log) => {
-  showActionMenu.value = null // Close menu first
+  activeMenuId.value = null // Close menu first
   
   try {
     // Create a detailed log information object
@@ -757,4 +1041,70 @@ const handleSeveritySearch = () => {
     addToast('Please enter search criteria', 'warning')
   }
 }
+
+// Modal transition handlers
+const onModalEnter = (el) => {
+  el.style.transform = 'scale(0.9)'
+  el.style.opacity = '0'
+  
+  requestAnimationFrame(() => {
+    el.style.transition = 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+    el.style.transform = 'scale(1)'
+    el.style.opacity = '1'
+  })
+}
+
+const onModalLeave = (el) => {
+  el.style.transition = 'all 0.2s ease-in'
+  el.style.transform = 'scale(0.95)'
+  el.style.opacity = '0'
+}
+
+// Glassmorphic popup animation handlers
+const onPopupEnter = (el) => {
+  el.style.opacity = '0'
+  el.style.transform = 'scale(0.95) translateY(-10px)'
+  
+  requestAnimationFrame(() => {
+    el.style.transition = 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+    el.style.opacity = '1'
+    el.style.transform = 'scale(1) translateY(0)'
+  })
+}
+
+const onPopupLeave = (el) => {
+  el.style.transition = 'all 0.2s ease-out'
+  el.style.opacity = '0'
+  el.style.transform = 'scale(0.95) translateY(-10px)'
+}
 </script>
+
+<style scoped>
+/* Glassmorphic popup transition animations */
+.glassmorphic-popup-enter-active,
+.glassmorphic-popup-leave-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glassmorphic-popup-enter-from,
+.glassmorphic-popup-leave-to {
+  opacity: 0;
+  transform: scale(0.95) translateY(-10px);
+}
+
+.glassmorphic-popup-enter-to,
+.glassmorphic-popup-leave-from {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* Enhanced action button styling */
+:deep(.action-btn) {
+  transition: all 0.2s ease;
+}
+
+:deep(.action-btn:hover) {
+  color: rgb(6, 182, 212);
+  background-color: rgba(6, 182, 212, 0.1);
+}
+</style>

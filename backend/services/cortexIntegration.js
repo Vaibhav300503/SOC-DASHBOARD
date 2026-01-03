@@ -15,7 +15,7 @@ const isConfigured = () => {
 const getClient = () => {
   if (!isConfigured()) return null
 
-  const authHeader = CORTEX_AUTH_HEADER || CORTEX_API_KEY
+  const authHeader = CORTEX_AUTH_HEADER || `Bearer ${CORTEX_API_KEY}`
 
   return axios.create({
     baseURL: CORTEX_BASE_URL,
@@ -46,7 +46,8 @@ export const triggerAnalyzersForAlert = async (alertEvent) => {
     const jobs = []
 
     for (const analyzerId of analyzerIds) {
-      const path = (CORTEX_ANALYZERS_PATH || '/api/v1/analyzers') + `/${analyzerId}/jobs`
+      // Use the correct endpoint format: /api/analyzer/{id}/run
+      const path = `/api/analyzer/${analyzerId}/run`
       const payload = {
         data: alertEvent.source_ip || alertEvent.dest_ip,
         dataType: 'ip',

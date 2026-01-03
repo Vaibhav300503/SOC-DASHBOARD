@@ -3,7 +3,7 @@
     <!-- Page Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-black title-gradient tracking-tight">Log Types</h1>
+        <h1 class="text-3xl font-black title-gradient tracking-tight">Log Types Analysis</h1>
         <p class="text-slate-dark-400 mt-2 font-medium opacity-80">Categorized security logs by type</p>
       </div>
     </div>
@@ -25,11 +25,70 @@
       </button>
     </div>
 
+    <!-- Severity Filter Buttons -->
+    <div class="flex gap-2 overflow-x-auto pb-2">
+      <button
+        @click="filterSeverity = ''"
+        :class="[
+          'px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all duration-200',
+          filterSeverity === ''
+            ? 'bg-cyber-600 text-white border border-cyber-500'
+            : 'bg-slate-dark-800 text-slate-dark-300 border border-slate-dark-700 hover:border-cyber-500'
+        ]"
+      >
+        All Severities
+      </button>
+      <button
+        @click="filterSeverity = 'Critical'"
+        :class="[
+          'px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all duration-200',
+          filterSeverity === 'Critical'
+            ? 'bg-red-600 text-white border border-red-500'
+            : 'bg-slate-dark-800 text-slate-dark-300 border border-slate-dark-700 hover:border-red-500'
+        ]"
+      >
+        Critical
+      </button>
+      <button
+        @click="filterSeverity = 'High'"
+        :class="[
+          'px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all duration-200',
+          filterSeverity === 'High'
+            ? 'bg-orange-600 text-white border border-orange-500'
+            : 'bg-slate-dark-800 text-slate-dark-300 border border-slate-dark-700 hover:border-orange-500'
+        ]"
+      >
+        High
+      </button>
+      <button
+        @click="filterSeverity = 'Medium'"
+        :class="[
+          'px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all duration-200',
+          filterSeverity === 'Medium'
+            ? 'bg-yellow-600 text-white border border-yellow-500'
+            : 'bg-slate-dark-800 text-slate-dark-300 border border-slate-dark-700 hover:border-yellow-500'
+        ]"
+      >
+        Medium
+      </button>
+      <button
+        @click="filterSeverity = 'Low'"
+        :class="[
+          'px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all duration-200',
+          filterSeverity === 'Low'
+            ? 'bg-green-600 text-white border border-green-500'
+            : 'bg-slate-dark-800 text-slate-dark-300 border border-slate-dark-700 hover:border-green-500'
+        ]"
+      >
+        Low
+      </button>
+    </div>
+
     <!-- Statistics -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <div class="stat-card card-accent-cyan">
-        <div class="stat-value text-accent-primary">{{ logsOfSelectedType.length }}</div>
-        <div class="stat-label">{{ selectedLogType }} Logs</div>
+        <div class="stat-value text-accent-primary">{{ apiStore.totalLogs }}</div>
+        <div class="stat-label">Total Logs</div>
       </div>
       <div class="stat-card card-accent-red">
         <div class="stat-value text-neon-red">{{ criticalCount }}</div>
@@ -39,6 +98,10 @@
         <div class="stat-value text-neon-orange">{{ highCount }}</div>
         <div class="stat-label">High</div>
       </div>
+      <div class="stat-card card-accent-yellow">
+        <div class="stat-value text-neon-yellow">{{ mediumCount }}</div>
+        <div class="stat-label">Medium</div>
+      </div>
       <div class="stat-card card-accent-green">
         <div class="stat-value text-neon-green">{{ lowCount }}</div>
         <div class="stat-label">Low</div>
@@ -47,7 +110,19 @@
 
     <!-- Filters -->
     <div class="card-glass p-4 rounded-xl">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-dark-300 mb-2">Log Type</label>
+          <select v-model="selectedLogType" class="input-cyber w-full">
+            <option value="All">All Types</option>
+            <option value="Firewall">Firewall</option>
+            <option value="IDS">IDS</option>
+            <option value="Authentication">Authentication</option>
+            <option value="App">App</option>
+            <option value="System">System</option>
+            <option value="Registry">Registry</option>
+          </select>
+        </div>
         <div>
           <label class="block text-sm font-medium text-slate-dark-300 mb-2">Severity</label>
           <select v-model="filterSeverity" class="input-cyber w-full">
@@ -67,20 +142,19 @@
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-dark-300 mb-2">Action</label>
-          <select v-model="filterAction" class="input-cyber w-full">
-            <option value="">All Actions</option>
-            <option v-if="selectedLogType === 'Registry' || selectedLogType === 'All'" value="CREATE">Create Key</option>
-            <option v-if="selectedLogType === 'Registry' || selectedLogType === 'All'" value="DELETE">Delete Key</option>
-            <option v-if="selectedLogType === 'Registry' || selectedLogType === 'All'" value="MODIFY">Modify Key</option>
-            <option v-if="selectedLogType === 'Registry' || selectedLogType === 'All'" value="READ">Read Key</option>
-            <option v-if="selectedLogType !== 'Registry'" value="ALLOW">Allow</option>
-            <option v-if="selectedLogType !== 'Registry'" value="DENY">Deny</option>
-          </select>
+          <label class="block text-sm font-medium text-slate-dark-300 mb-2">Source IP</label>
+          <div class="relative">
+            <input v-model="filterSourceIP" type="text" placeholder="Filter by IP..." class="input-cyber w-full pr-10">
+            <button v-if="filterSourceIP" @click="filterSourceIP = ''" class="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-300">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
         </div>
         <div class="flex items-end">
-          <button @click="handleLogTypesSearch" class="btn-cyber w-full">
-            <i class="fas fa-search mr-2"></i>Apply Filters
+          <button @click="handleLogTypesSearch" :disabled="isLoading" class="btn-cyber w-full">
+            <i v-if="isLoading" class="fas fa-spinner fa-spin mr-2"></i>
+            <i v-else class="fas fa-search mr-2"></i>
+            {{ isLoading ? 'Searching...' : 'Apply Filters' }}
           </button>
         </div>
       </div>
@@ -89,9 +163,16 @@
     <!-- Logs Table -->
     <div class="card-glass p-6 rounded-xl border-t border-t-accent-primary/10">
       <div class="flex items-center justify-between mb-6">
-        <h3 class="text-lg font-black title-gradient">{{ selectedLogType }} Logs</h3>
+        <h3 class="text-lg font-black title-gradient">
+          {{ selectedLogType }} 
+          {{ filterSeverity ? `${filterSeverity} ` : '' }}
+          Logs
+        </h3>
         <div class="flex items-center gap-2">
-          <div v-if="selectedLogType === 'All' && isLoading" class="text-cyber-400 text-sm">
+          <span class="px-2 py-0.5 bg-accent-primary/10 text-accent-primary text-[10px] font-bold rounded">
+            {{ filteredLogs.length }} TOTAL
+          </span>
+          <div v-if="isLoading" class="text-cyber-400 text-sm">
             <i class="fas fa-spinner fa-spin mr-2"></i>Loading...
           </div>
           <button @click="exportLogs" class="btn-cyber-outline">
@@ -114,11 +195,20 @@
               <th>Log Type</th>
               <th>Severity</th>
               <th>Action</th>
-              <th>Details</th>
+              <th class="text-center">Details</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="log in filteredLogs.slice(0, 20)" :key="log.id">
+            <tr v-if="filteredLogs.length === 0">
+              <td :colspan="selectedLogType === 'Registry' || selectedLogType === 'All' ? 9 : 10" class="text-center py-12">
+                <div class="text-slate-500">
+                  <i class="fas fa-inbox text-4xl mb-3 block opacity-50"></i>
+                  <p class="text-sm">No logs available</p>
+                  <p class="text-xs text-slate-600 mt-1">Data will be updated when available</p>
+                </div>
+              </td>
+            </tr>
+            <tr v-else v-for="log in filteredLogs.slice(0, displayLimit)" :key="log.id">
               <td class="text-slate-dark-400 text-sm">{{ formatTime(log.timestamp) }}</td>
               <td>
                 <code class="text-cyber-400 font-mono text-sm">{{ log.computer || log.source_ip }}</code>
@@ -138,8 +228,8 @@
                 </span>
               </td>
               <td>
-                <span :class="['badge-' + log.severity.toLowerCase()]">
-                  {{ log.severity }}
+                <span :class="['badge-' + getSeverityClass(log.severity)]">
+                  {{ getSeverityLabel(log.severity) }}
                 </span>
               </td>
               <td>
@@ -158,13 +248,13 @@
                   {{ log.raw?.action || 'N/A' }}
                 </span>
               </td>
-              <td>
+              <td class="text-center">
                 <button 
                   @click="showLogDetails(log)"
-                  class="text-cyber-400 hover:text-cyber-300 transition-colors"
+                  class="inline-flex items-center justify-center w-8 h-8 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 rounded-lg transition-all duration-200"
                   title="View Details"
                 >
-                  <i class="fas fa-chevron-right"></i>
+                  <i class="fas fa-eye text-sm"></i>
                 </button>
               </td>
             </tr>
@@ -172,25 +262,45 @@
         </table>
       </div>
 
-      <div class="mt-4 text-sm text-slate-dark-400">
-        Showing {{ Math.min(20, filteredLogs.length) }} of {{ filteredLogs.length }} logs
+      <div class="mt-4 flex items-center justify-between">
+        <div class="text-sm text-slate-dark-400">
+          Showing {{ Math.min(displayLimit, filteredLogs.length) }} of {{ filteredLogs.length }} logs
+        </div>
+        <button 
+          v-if="displayLimit < filteredLogs.length"
+          @click="displayLimit += 20"
+          class="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/50 text-cyan-400 hover:border-cyan-400 hover:shadow-lg hover:shadow-cyan-500/30 transition-all duration-300 text-sm font-medium group relative overflow-hidden"
+        >
+          <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <i class="fas fa-chevron-down mr-2"></i>
+          <span class="relative">Load More</span>
+        </button>
       </div>
     </div>
 
     <!-- Log Details Modal -->
     <div 
       v-if="selectedLog"
-      class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+      class="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4"
       @click.self="closeLogDetails"
     >
-      <div class="bg-bg-secondary border border-glass-border/20 rounded-xl max-w-4xl max-h-[90vh] overflow-y-auto m-4 shadow-2xl backdrop-blur-xl">
-        <!-- Modal Header -->
-        <div class="sticky top-0 bg-bg-secondary/80 backdrop-blur-md border-b border-glass-border/20 p-6 z-10">
-          <div class="flex items-center justify-between">
-            <h3 class="text-xl font-black title-gradient">Log Details</h3>
+      <div class="bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/30 rounded-2xl max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl backdrop-blur-xl group relative">
+        <!-- Animated gradient background on hover -->
+        <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/5 to-cyan-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl pointer-events-none"></div>
+
+        <!-- Top accent line -->
+        <div class="h-0.5 bg-gradient-to-r from-cyan-500/0 via-cyan-500/50 to-cyan-500/0 group-hover:via-cyan-500/100 transition-all duration-300 rounded-t-2xl"></div>
+
+        <!-- Modal Header - Sticky -->
+        <div class="sticky top-0 bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-xl border-b border-slate-700/50 p-6 z-20 shadow-lg">
+          <div class="flex items-center justify-between relative z-10">
+            <div>
+              <h3 class="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">Log Details</h3>
+              <p class="text-xs text-slate-400 mt-1">{{ selectedLog.log_type }} • {{ formatFullTime(selectedLog.timestamp) }}</p>
+            </div>
             <button 
               @click="closeLogDetails"
-              class="text-slate-dark-400 hover:text-slate-dark-300 transition-colors"
+              class="text-slate-400 hover:text-cyan-400 transition-colors p-2 hover:bg-cyan-500/10 rounded-lg"
             >
               <i class="fas fa-times text-xl"></i>
             </button>
@@ -198,83 +308,94 @@
         </div>
 
         <!-- Modal Body -->
-        <div class="p-6 space-y-6">
+        <div class="p-6 space-y-6 relative z-10">
           <!-- Quick Info Cards -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-              <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">Severity</div>
-              <div :class="['badge-' + (selectedLog.severity || 'low').toLowerCase()]">
-                {{ selectedLog.severity || 'Low' }}
+            <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-4 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group/card relative overflow-hidden">
+              <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
+              <div class="relative z-10">
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-2 font-medium">Severity</div>
+                <div :class="['badge-' + (selectedLog.severity || 'low').toLowerCase()]">
+                  {{ selectedLog.severity || 'Low' }}
+                </div>
               </div>
             </div>
-            <div class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-              <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">Action</div>
-              <div class="text-lg font-semibold" :class="(selectedLog.raw?.action || selectedLog.raw_data?.action) === 'ALLOW' ? 'text-neon-green' : 'text-neon-red'">
-                {{ selectedLog.raw?.action || selectedLog.raw_data?.action || 'N/A' }}
+            <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-4 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group/card relative overflow-hidden">
+              <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
+              <div class="relative z-10">
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-2 font-medium">Action</div>
+                <div class="text-lg font-semibold" :class="(selectedLog.raw?.action || selectedLog.raw_data?.action) === 'ALLOW' ? 'text-emerald-400' : 'text-red-400'">
+                  {{ selectedLog.raw?.action || selectedLog.raw_data?.action || 'N/A' }}
+                </div>
               </div>
             </div>
-            <div class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-              <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">Timestamp</div>
-              <div class="text-sm text-slate-dark-300">{{ formatFullTime(selectedLog.timestamp) }}</div>
+            <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-4 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group/card relative overflow-hidden">
+              <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
+              <div class="relative z-10">
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-2 font-medium">Timestamp</div>
+                <div class="text-sm text-slate-300">{{ formatFullTime(selectedLog.timestamp) }}</div>
+              </div>
             </div>
           </div>
 
           <!-- Registry Information -->
-          <div v-if="selectedLog.log_type === 'Registry'" class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-            <h4 class="text-sm font-semibold text-slate-dark-300 mb-3 flex items-center">
-              <i class="fas fa-database mr-2 text-cyber-400"></i>
+          <div v-if="selectedLog.log_type === 'Registry'" class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-5 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group/card relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
+            <h4 class="text-sm font-semibold text-slate-50 mb-4 flex items-center relative z-10">
+              <i class="fas fa-database mr-2 text-cyan-400"></i>
               Registry Information
             </h4>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
               <div>
-                <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">Computer</div>
-                <div class="text-slate-dark-300">{{ selectedLog.computer || 'Unknown' }}</div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Computer</div>
+                <div class="text-slate-300">{{ selectedLog.computer || 'Unknown' }}</div>
               </div>
               <div>
-                <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">User</div>
-                <div class="text-slate-dark-300">{{ selectedLog.user || 'Unknown' }}</div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">User</div>
+                <div class="text-slate-300">{{ selectedLog.user || 'Unknown' }}</div>
               </div>
               <div class="md:col-span-2">
-                <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">Registry Path</div>
-                <div class="text-cyber-400 font-mono bg-slate-dark-800 px-2 py-1 rounded text-sm break-all">
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Registry Path</div>
+                <div class="text-cyan-400 font-mono bg-slate-900/50 px-3 py-2 rounded-lg text-sm break-all border border-slate-700/30">
                   {{ selectedLog.registry_path || 'N/A' }}
                 </div>
               </div>
               <div>
-                <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">Key Name</div>
-                <div class="text-slate-dark-300 font-mono text-sm">{{ selectedLog.key_name || 'N/A' }}</div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Key Name</div>
+                <div class="text-slate-300 font-mono text-sm">{{ selectedLog.key_name || 'N/A' }}</div>
               </div>
               <div>
-                <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">Value Type</div>
-                <div class="text-slate-dark-300">{{ selectedLog.value_type || 'N/A' }}</div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Value Type</div>
+                <div class="text-slate-300">{{ selectedLog.value_type || 'N/A' }}</div>
               </div>
               <div v-if="selectedLog.old_value">
-                <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">Previous Value</div>
-                <div class="text-slate-dark-300 font-mono text-sm">{{ selectedLog.old_value }}</div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Previous Value</div>
+                <div class="text-slate-300 font-mono text-sm">{{ selectedLog.old_value }}</div>
               </div>
               <div v-if="selectedLog.new_value">
-                <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">New Value</div>
-                <div class="text-slate-dark-300 font-mono text-sm">{{ selectedLog.new_value }}</div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">New Value</div>
+                <div class="text-slate-300 font-mono text-sm">{{ selectedLog.new_value }}</div>
               </div>
             </div>
           </div>
 
           <!-- Network Information (for non-Registry logs) -->
-          <div v-if="selectedLog.log_type !== 'Registry'" class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-            <h4 class="text-sm font-semibold text-slate-dark-300 mb-3 flex items-center">
-              <i class="fas fa-network-wired mr-2 text-cyber-400"></i>
+          <div v-if="selectedLog.log_type !== 'Registry'" class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-5 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group/card relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
+            <h4 class="text-sm font-semibold text-slate-50 mb-4 flex items-center relative z-10">
+              <i class="fas fa-network-wired mr-2 text-cyan-400"></i>
               Network Information
             </h4>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
               <div>
-                <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">Source IP</div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Source IP</div>
                 <div class="flex items-center gap-2">
-                  <code class="text-cyber-400 font-mono bg-slate-dark-800 px-2 py-1 rounded">
+                  <code class="text-cyan-400 font-mono bg-slate-900/50 px-3 py-2 rounded-lg border border-slate-700/30">
                     {{ selectedLog.source_ip }}
                   </code>
                   <button 
                     @click="lookupIP(selectedLog.source_ip)"
-                    class="text-cyber-400 hover:text-cyber-300 text-sm"
+                    class="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 p-2 rounded-lg transition-all text-sm"
                     title="Lookup IP"
                   >
                     <i class="fas fa-search"></i>
@@ -282,14 +403,14 @@
                 </div>
               </div>
               <div>
-                <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">Destination IP</div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Destination IP</div>
                 <div class="flex items-center gap-2">
-                  <code class="text-cyber-400 font-mono bg-slate-dark-800 px-2 py-1 rounded">
+                  <code class="text-cyan-400 font-mono bg-slate-900/50 px-3 py-2 rounded-lg border border-slate-700/30">
                     {{ selectedLog.dest_ip }}
                   </code>
                   <button 
                     @click="lookupIP(selectedLog.dest_ip)"
-                    class="text-cyber-400 hover:text-cyber-300 text-sm"
+                    class="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 p-2 rounded-lg transition-all text-sm"
                     title="Lookup IP"
                   >
                     <i class="fas fa-search"></i>
@@ -297,81 +418,87 @@
                 </div>
               </div>
               <div>
-                <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">Endpoint</div>
-                <div class="text-slate-dark-300">{{ selectedLog.endpoint || selectedLog.metadata?.endpoint_name || 'N/A' }}</div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Endpoint</div>
+                <div class="text-slate-300">{{ selectedLog.endpoint || selectedLog.metadata?.endpoint_name || 'N/A' }}</div>
               </div>
               <div>
-                <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">Protocol</div>
-                <div class="text-slate-dark-300">{{ selectedLog.raw?.protocol || selectedLog.raw_data?.protocol || selectedLog.protocol || 'N/A' }}</div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Protocol</div>
+                <div class="text-slate-300">{{ selectedLog.raw?.protocol || selectedLog.raw_data?.protocol || selectedLog.protocol || 'N/A' }}</div>
               </div>
             </div>
           </div>
 
           <!-- Geo Location (if available) -->
-          <div v-if="selectedLog.geo" class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-            <h4 class="text-sm font-semibold text-slate-dark-300 mb-3 flex items-center">
-              <i class="fas fa-globe mr-2 text-cyber-400"></i>
+          <div v-if="selectedLog.geo" class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-5 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group/card relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
+            <h4 class="text-sm font-semibold text-slate-50 mb-4 flex items-center relative z-10">
+              <i class="fas fa-globe mr-2 text-cyan-400"></i>
               Geographic Information
             </h4>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10">
               <div>
-                <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">Country</div>
-                <div class="text-slate-dark-300">{{ selectedLog.geo?.country || 'Unknown' }}</div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Country</div>
+                <div class="text-slate-300">{{ selectedLog.geo?.country || 'Unknown' }}</div>
               </div>
               <div>
-                <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">City</div>
-                <div class="text-slate-dark-300">{{ selectedLog.geo?.city || 'Unknown' }}</div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">City</div>
+                <div class="text-slate-300">{{ selectedLog.geo?.city || 'Unknown' }}</div>
               </div>
               <div>
-                <div class="text-xs text-slate-dark-400 uppercase tracking-wide mb-1">Organization</div>
-                <div class="text-slate-dark-300">{{ selectedLog.geo?.org || 'Unknown' }}</div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Organization</div>
+                <div class="text-slate-300">{{ selectedLog.geo?.org || 'Unknown' }}</div>
               </div>
             </div>
           </div>
 
           <!-- Raw Log Data -->
-          <div class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-            <div class="flex items-center justify-between mb-3">
-              <h4 class="text-sm font-semibold text-slate-dark-300 flex items-center">
-                <i class="fas fa-code mr-2 text-cyber-400"></i>
+          <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-5 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group/card relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
+            <div class="flex items-center justify-between mb-4 relative z-10">
+              <h4 class="text-sm font-semibold text-slate-50 flex items-center">
+                <i class="fas fa-code mr-2 text-cyan-400"></i>
                 Raw Log Data
               </h4>
               <button 
                 @click="copyRawLog"
-                class="text-cyber-400 hover:text-cyber-300 text-sm"
+                class="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 px-3 py-1.5 rounded-lg text-sm transition-all font-medium"
                 title="Copy to clipboard"
               >
                 <i class="fas fa-copy mr-1"></i>Copy
               </button>
             </div>
-            <pre class="bg-slate-dark-800 p-4 rounded-lg overflow-x-auto text-xs text-slate-dark-300 font-mono">{{ JSON.stringify(selectedLog.raw || selectedLog.raw_data || selectedLog, null, 2) }}</pre>
+            <pre class="bg-slate-900/50 p-4 rounded-lg overflow-x-auto text-xs text-slate-300 font-mono border border-slate-700/30 relative z-10">{{ JSON.stringify(selectedLog.raw || selectedLog.raw_data || selectedLog, null, 2) }}</pre>
           </div>
 
           <!-- Action Buttons -->
-          <div class="flex gap-3 pt-4 border-t border-slate-dark-700">
+          <div class="flex gap-3 pt-4 border-t border-slate-700/30 relative z-10">
             <button 
               @click="blockIP(selectedLog.source_ip)"
               :disabled="isLoading"
-              class="btn-cyber-outline bg-neon-red/20 text-neon-red border-neon-red/50 hover:bg-neon-red/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="px-4 py-2.5 rounded-lg bg-gradient-to-r from-red-500/20 to-red-600/20 border border-red-500/50 text-red-400 hover:border-red-400 hover:shadow-lg hover:shadow-red-500/30 transition-all duration-300 text-sm font-medium group relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
             >
+              <div class="absolute inset-0 bg-gradient-to-r from-red-500/0 via-red-500/10 to-red-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <i v-if="isLoading" class="fas fa-spinner fa-spin mr-2"></i>
               <i v-else class="fas fa-ban mr-2"></i>
-              {{ isLoading ? 'Blocking...' : 'Block Source IP' }}
+              <span class="relative">{{ isLoading ? 'Blocking...' : 'Block Source IP' }}</span>
             </button>
             <button 
               @click="createAlert(selectedLog)"
               :disabled="isLoading"
-              class="btn-cyber-outline disabled:opacity-50 disabled:cursor-not-allowed"
+              class="px-4 py-2.5 rounded-lg bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/50 text-yellow-400 hover:border-yellow-400 hover:shadow-lg hover:shadow-yellow-500/30 transition-all duration-300 text-sm font-medium group relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
             >
+              <div class="absolute inset-0 bg-gradient-to-r from-yellow-500/0 via-yellow-500/10 to-yellow-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <i v-if="isLoading" class="fas fa-spinner fa-spin mr-2"></i>
               <i v-else class="fas fa-exclamation-triangle mr-2"></i>
-              {{ isLoading ? 'Creating...' : 'Create Alert' }}
+              <span class="relative">{{ isLoading ? 'Creating...' : 'Create Alert' }}</span>
             </button>
             <button 
               @click="exportLog(selectedLog)"
-              class="btn-cyber-outline"
+              class="px-4 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/50 text-cyan-400 hover:border-cyan-400 hover:shadow-lg hover:shadow-cyan-500/30 transition-all duration-300 text-sm font-medium group relative overflow-hidden"
             >
-              <i class="fas fa-download mr-2"></i>Export
+              <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <i class="fas fa-download mr-2"></i>
+              <span class="relative">Export</span>
             </button>
           </div>
         </div>
@@ -380,8 +507,18 @@
 
     <!-- Log Type Distribution Chart -->
     <div class="card-glass p-6 rounded-xl border-t border-t-accent-secondary/10">
-      <h3 class="text-lg font-black title-gradient mb-6">Distribution by Severity</h3>
-      <div class="space-y-4">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-black title-gradient">Distribution by Severity</h3>
+        <span class="px-2 py-0.5 bg-accent-secondary/10 text-accent-secondary text-[10px] font-bold rounded">
+          {{ severityDistribution.reduce((sum, item) => sum + item.value, 0) }} TOTAL
+        </span>
+      </div>
+      <div v-if="severityDistribution.length === 0 || severityDistribution.every(item => item.value === 0)" class="text-center py-8 text-slate-500">
+        <i class="fas fa-chart-bar text-3xl mb-3 block opacity-50"></i>
+        <p class="text-sm">No severity data available</p>
+        <p class="text-xs text-slate-600 mt-1">Data will be updated when available</p>
+      </div>
+      <div v-else class="space-y-4">
         <div v-for="item in severityDistribution" :key="item.name" class="space-y-2">
           <div class="flex items-center justify-between">
             <span class="text-sm font-medium text-slate-dark-300">{{ item.name }}</span>
@@ -389,9 +526,9 @@
           </div>
           <div class="w-full bg-slate-dark-900/50 rounded-full h-2 overflow-hidden border border-slate-dark-700/50">
             <div
-              class="h-full rounded-full"
+              class="h-full rounded-full transition-all duration-300"
               :style="{
-                width: `${(item.value / logsOfSelectedType.length) * 100}%`,
+                width: `${item.value > 0 ? Math.max((item.value / Math.max(...severityDistribution.map(s => s.value))) * 100, 2) : 0}%`,
                 backgroundColor: item.color,
               }"
             />
@@ -437,88 +574,121 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useLogStore } from '../stores/logStore'
+import { useAPIStore } from '../stores/apiStore'
 import { useToast } from '../composables/useToast'
+import { normalizeSeverity, getSeverityClass, getSeverityLabel } from '../utils/severityNormalization'
 import axios from 'axios'
 
 const logStore = useLogStore()
+const apiStore = useAPIStore()
 const { addToast, toasts, removeToast } = useToast()
 const logTypes = ['All', 'Firewall', 'IDS', 'Authentication', 'App', 'System', 'Registry']
 const selectedLogType = ref('All')
 const filterSeverity = ref('')
 const filterTimeRange = ref('24h')
 const filterAction = ref('')
+const filterSourceIP = ref('')
 const selectedLog = ref(null)
 const isLoading = ref(false)
+const displayLimit = ref(20)
 
 onMounted(() => {
-  if (logStore.logs.length === 0) {
-    logStore.initializeLogs()
-  }
-  // Fetch all logs for the "All" tab
-  fetchAllLogsData()
+  // Fetch logs from backend like LogViewer does
+  apiStore.fetchRecentLogs(1000)
+  // Fetch dashboard stats to get severity breakdown
+  apiStore.fetchDashboardStats()
 })
 
-// Watch for log type changes to fetch data accordingly
-const fetchAllLogsData = async () => {
-  if (selectedLogType.value === 'All') {
-    isLoading.value = true
-    try {
-      await logStore.fetchAllLogs({
-        timeRange: filterTimeRange.value,
-        severity: filterSeverity.value,
-        action: filterAction.value
-      })
-    } catch (error) {
-      console.error('Failed to fetch all logs:', error)
-      addToast('Failed to fetch all logs', 'error')
-    } finally {
-      isLoading.value = false
-    }
-  }
-}
-
-// Watch for filter changes
-watch([filterTimeRange, filterSeverity, filterAction], () => {
-  if (selectedLogType.value === 'All') {
-    fetchAllLogsData()
-  }
-})
-
-// Watch for log type changes
-watch(selectedLogType, () => {
-  if (selectedLogType.value === 'All') {
-    fetchAllLogsData()
-  }
+// Watch for filter changes and apply them
+watch([selectedLogType, filterSeverity, filterTimeRange, filterAction, filterSourceIP], (newValues, oldValues) => {
+  console.log('Filter changed:', { 
+    selectedLogType: newValues[0], 
+    filterSeverity: newValues[1], 
+    filterTimeRange: newValues[2], 
+    filterAction: newValues[3], 
+    filterSourceIP: newValues[4] 
+  })
+  // Reset display limit when filters change
+  displayLimit.value = 20
 })
 
 const logsOfSelectedType = computed(() => {
+  let logs = []
+  
   if (selectedLogType.value === 'All') {
-    // Use the fetched allLogs from the store
-    return logStore.allLogs.length > 0 ? logStore.allLogs : [...logStore.logs, ...(logStore.registryLogs || [])]
+    // Use the fetched logs from apiStore (1000 logs from backend)
+    logs = apiStore.logs || []
+  } else if (selectedLogType.value === 'Registry') {
+    logs = logStore.registryLogs || []
+  } else {
+    // Filter logs by selected log type from apiStore.logs
+    logs = (apiStore.logs || []).filter(l => l.log_type === selectedLogType.value)
   }
-  if (selectedLogType.value === 'Registry') {
-    return logStore.registryLogs
-  }
-  return logStore.logs.filter(l => l.log_type === selectedLogType.value)
+  
+  return logs
 })
 
 const filteredLogs = computed(() => {
-  return logsOfSelectedType.value.filter(log => {
-    if (filterSeverity.value && log.severity !== filterSeverity.value) return false
-    const action = log.raw?.action || log.raw_data?.action || log.action
-    if (filterAction.value && action !== filterAction.value) return false
-    return true
+  let logs = logsOfSelectedType.value
+  console.log('Filtering logs:', { 
+    totalLogs: logs.length, 
+    filterSeverity: filterSeverity.value,
+    selectedLogType: selectedLogType.value 
   })
+  
+  // Apply severity filter
+  if (filterSeverity.value) {
+    logs = logs.filter(log => {
+      const normalizedSeverity = normalizeSeverity(log.severity)
+      return normalizedSeverity === filterSeverity.value
+    })
+    console.log('After severity filter:', logs.length)
+  }
+  
+  // Apply action filter
+  if (filterAction.value) {
+    logs = logs.filter(log => {
+      const action = log.raw?.action || log.raw_data?.action || log.action
+      return action === filterAction.value
+    })
+  }
+  
+  // Apply source IP filter
+  if (filterSourceIP.value) {
+    logs = logs.filter(log => {
+      const sourceIP = log.source_ip || log.ip_address
+      return sourceIP && sourceIP.toLowerCase().includes(filterSourceIP.value.toLowerCase())
+    })
+  }
+  
+  return logs
 })
 
-const criticalCount = computed(() => logsOfSelectedType.value.filter(l => l.severity === 'Critical').length)
-const highCount = computed(() => logsOfSelectedType.value.filter(l => l.severity === 'High').length)
-const lowCount = computed(() => logsOfSelectedType.value.filter(l => l.severity === 'Low').length)
+const criticalCount = computed(() => {
+  // Use backend severity breakdown (same as Dashboard)
+  // CRITICAL: All pages must use the same source for consistency
+  return apiStore.severityBreakdown.find(s => s._id === 'Critical')?.count || 0
+})
+
+const highCount = computed(() => {
+  // Use backend severity breakdown (same as Dashboard)
+  return apiStore.severityBreakdown.find(s => s._id === 'High')?.count || 0
+})
+
+const lowCount = computed(() => {
+  // Use backend severity breakdown (same as Dashboard)
+  return apiStore.severityBreakdown.find(s => s._id === 'Low')?.count || 0
+})
+
+const mediumCount = computed(() => {
+  // Use backend severity breakdown (same as Dashboard)
+  return apiStore.severityBreakdown.find(s => s._id === 'Medium')?.count || 0
+})
 
 const severityDistribution = computed(() => [
   { name: 'Critical', value: criticalCount.value, color: '#ff0055' },
   { name: 'High', value: highCount.value, color: '#ff6b35' },
-  { name: 'Medium', value: logsOfSelectedType.value.filter(l => l.severity === 'Medium').length, color: '#ffd700' },
+  { name: 'Medium', value: mediumCount.value, color: '#ffd700' },
   { name: 'Low', value: lowCount.value, color: '#00ff88' },
 ])
 
@@ -547,11 +717,24 @@ const closeLogDetails = () => {
 }
 
 const handleLogTypesSearch = async () => {
-  if (selectedLogType.value === 'All') {
-    await fetchAllLogsData()
+  isLoading.value = true
+  try {
+    // Always fetch fresh data when search is triggered
+    await apiStore.fetchRecentLogs(1000)
+    
+    // If we have specific filters, we might want to fetch more targeted data
+    if (filterSourceIP.value || filterSeverity.value) {
+      // The computed properties will handle the filtering
+      addToast(`Applied filters - Found ${filteredLogs.value.length} logs`, 'success')
+    } else {
+      addToast(`Loaded ${logsOfSelectedType.value.length} ${selectedLogType.value} logs`, 'success')
+    }
+  } catch (error) {
+    console.error('Search failed:', error)
+    addToast('Failed to apply filters', 'error')
+  } finally {
+    isLoading.value = false
   }
-  // For other log types, filters are already applied via computed properties
-  addToast('Filters applied', 'success')
 }
 
 const copyRawLog = async () => {
@@ -628,8 +811,14 @@ const blockIP = async (ip) => {
 }
 
 const createAlert = async (log) => {
+  if (!log) {
+    addToast('Cannot create alert: No log selected', 'error')
+    return
+  }
+  
   const title = `Security Alert: ${log.severity} ${log.log_type} Event`
-  const description = `${log.raw.action} event detected from ${log.source_ip} to ${log.dest_ip}${log.endpoint ? ` at ${log.endpoint}` : ''}`
+  const action = log.raw?.action || log.log_type || 'Unknown'
+  const description = `${action} event detected from ${log.source_ip} to ${log.dest_ip}${log.endpoint ? ` at ${log.endpoint}` : ''}`
   
   isLoading.value = true
   try {

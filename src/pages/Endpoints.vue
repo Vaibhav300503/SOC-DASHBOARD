@@ -120,17 +120,71 @@
     </div>
 
     <!-- Main Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <!-- Left: Timeline -->
-      <div class="lg:col-span-2">
+    <div class="grid grid-cols-1 lg:grid-cols-1 gap-8">
+      <!-- Timeline (Full Width) -->
+      <div>
         <EndpointTimeline />
+      </div>
+    </div>
+
+    <!-- Endpoints Table and Top Attacking IPs Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <!-- Left: Endpoint Details Table (2 columns) -->
+      <div class="lg:col-span-2 card-glass p-6 rounded-xl border-t border-t-accent-cyan/10">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-lg font-black title-gradient">Endpoint Details</h3>
+          <button @click="exportEndpoints" class="btn-cyber-outline">
+            <i class="fas fa-download mr-1"></i>Export
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="table-cyber">
+            <thead>
+              <tr>
+                <th>Endpoint</th>
+                <th>Total Events</th>
+                <th>Critical</th>
+                <th>Error Rate</th>
+                <th>Last Activity</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="endpoint in endpointList.slice(0, 15)" :key="endpoint.name">
+                <td class="font-semibold text-slate-dark-50">{{ endpoint.name }}</td>
+                <td class="text-cyber-400 font-bold">{{ endpoint.totalEvents }}</td>
+                <td>
+                  <span class="text-neon-red font-semibold">{{ endpoint.critical }}</span>
+                </td>
+                <td>
+                  <span :class="[
+                    'font-semibold',
+                    endpoint.errorRate > 20 ? 'text-neon-red' : endpoint.errorRate > 10 ? 'text-neon-orange' : 'text-neon-green'
+                  ]">
+                    {{ endpoint.errorRate }}%
+                  </span>
+                </td>
+                <td class="text-slate-dark-400 text-sm">{{ endpoint.lastActivity }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Right: Top Attacking IPs -->
       <div class="card-glass p-6 rounded-xl border-t border-t-accent-secondary/10">
         <h3 class="text-lg font-black title-gradient mb-6">Top Attacking IPs</h3>
         <div class="space-y-3">
-          <div v-for="(ip, idx) in topAttackingIPs" :key="idx" class="bg-slate-dark-900/50 rounded-lg p-3 border border-slate-dark-700/50">
+          <div v-if="topAttackingIPs.length === 0" class="text-center py-8 text-slate-500">
+            <i class="fas fa-shield-alt text-3xl mb-3 block opacity-50"></i>
+            <p class="text-sm">No attacking IPs detected</p>
+            <p class="text-xs text-slate-600 mt-1">Data will be updated when threats are identified</p>
+            <button @click="refreshData" class="text-xs text-cyan-400 hover:text-cyan-300 mt-2 block">
+              Refresh Data
+            </button>
+          </div>
+          
+          <div v-else v-for="(ip, idx) in topAttackingIPs" :key="idx" class="bg-slate-dark-900/50 rounded-lg p-3 border border-slate-dark-700/50">
             <div class="flex items-center justify-between mb-2">
               <code class="text-cyber-400 font-mono text-sm">{{ ip.ip }}</code>
               <span :class="['badge-' + getSeverityClass(ip.count)]">
@@ -140,7 +194,7 @@
             <div class="w-full bg-slate-dark-900 rounded-full h-1 overflow-hidden">
               <div
                 class="h-full bg-gradient-to-r from-cyber-500 to-neon-purple"
-                :style="{ width: `${(ip.count / topAttackingIPs[0].count) * 100}%` }"
+                :style="{ width: `${(ip.count / (topAttackingIPs[0]?.count || 1)) * 100}%` }"
               />
             </div>
           </div>
@@ -148,64 +202,17 @@
       </div>
     </div>
 
-    <!-- Endpoints Table -->
-    <div class="card-glass p-6 rounded-xl border-t border-t-accent-cyan/10">
-      <div class="flex items-center justify-between mb-6">
-        <h3 class="text-lg font-black title-gradient">Endpoint Details</h3>
-        <button @click="exportEndpoints" class="btn-cyber-outline">
-          <i class="fas fa-download mr-1"></i>Export
-        </button>
-      </div>
-
-      <div class="overflow-x-auto">
-        <table class="table-cyber">
-          <thead>
-            <tr>
-              <th>Endpoint</th>
-              <th>Total Events</th>
-              <th>Critical</th>
-              <th>Error Rate</th>
-              <th>Last Activity</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="endpoint in endpointList.slice(0, 15)" :key="endpoint.name">
-              <td class="font-semibold text-slate-dark-50">{{ endpoint.name }}</td>
-              <td class="text-cyber-400 font-bold">{{ endpoint.totalEvents }}</td>
-              <td>
-                <span class="text-neon-red font-semibold">{{ endpoint.critical }}</span>
-              </td>
-              <td>
-                <span :class="[
-                  'font-semibold',
-                  endpoint.errorRate > 20 ? 'text-neon-red' : endpoint.errorRate > 10 ? 'text-neon-orange' : 'text-neon-green'
-                ]">
-                  {{ endpoint.errorRate }}%
-                </span>
-              </td>
-              <td class="text-slate-dark-400 text-sm">{{ endpoint.lastActivity }}</td>
-              <td>
-                <span :class="[
-                  'px-2 py-1 rounded-full text-xs font-semibold',
-                  endpoint.status === 'Active'
-                    ? 'bg-neon-green/20 text-neon-green'
-                    : 'bg-slate-dark-700/50 text-slate-dark-400'
-                ]">
-                  {{ endpoint.status }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
     <!-- Related Logs -->
     <div class="card-glass p-6 rounded-xl border-t border-t-accent-purple/10">
       <h3 class="text-lg font-black title-gradient mb-6">Recent Related Logs</h3>
       <div class="space-y-3">
-        <div v-for="log in recentLogs.slice(0, 10)" :key="log.id" class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
+        <div v-if="recentLogs.length === 0" class="text-center py-8 text-slate-500">
+          <i class="fas fa-file-alt text-3xl mb-3 block opacity-50"></i>
+          <p class="text-sm">No recent logs available</p>
+          <p class="text-xs text-slate-600 mt-1">Logs will appear here when activity is detected</p>
+        </div>
+        
+        <div v-else v-for="log in recentLogs.slice(0, 5)" :key="log.id" class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
           <div class="flex items-start justify-between">
             <div>
               <p class="text-sm font-semibold text-slate-dark-50">{{ log.endpoint }}</p>
@@ -214,8 +221,8 @@
                 {{ log.source_ip }} → {{ log.dest_ip }}
               </p>
             </div>
-            <span :class="['badge-' + log.severity.toLowerCase()]">
-              {{ log.severity }}
+            <span :class="['badge-' + getSeverityClassFromSeverity(log.severity)]">
+              {{ getSeverityLabel(log.severity) }}
             </span>
           </div>
           <div class="text-xs text-slate-dark-500 mt-2">
@@ -245,9 +252,26 @@ const searchResults = ref([])
 onMounted(async () => {
   await Promise.all([
     apiStore.fetchRecentLogs(1000),
-    apiStore.fetchAgents()
+    apiStore.fetchAgents(),
+    apiStore.fetchDashboardStats() // Ensure we have topSourceIPs data
   ])
 })
+
+// Refresh data function
+const refreshData = async () => {
+  console.log('Refreshing data...')
+  try {
+    await Promise.all([
+      apiStore.fetchRecentLogs(1000),
+      apiStore.fetchDashboardStats()
+    ])
+    console.log('Data refreshed successfully')
+    addToast('Data refreshed successfully', 'success')
+  } catch (error) {
+    console.error('Error refreshing data:', error)
+    addToast('Failed to refresh data', 'error')
+  }
+}
 
 // Search functionality
 const performSearch = () => {
@@ -359,7 +383,34 @@ const mostActiveEndpoint = computed(() => {
 })
 
 const topAttackingIPs = computed(() => {
-  return (apiStore.topSourceIPs || []).slice(0, 5)
+  // First try to use the dashboard stats data
+  if (apiStore.topSourceIPs && apiStore.topSourceIPs.length > 0) {
+    return apiStore.topSourceIPs.slice(0, 5).map(item => ({
+      ip: item._id,
+      count: item.count
+    }))
+  }
+  
+  // Fallback: Calculate from recent logs if dashboard stats not available
+  if (apiStore.logs && apiStore.logs.length > 0) {
+    const ipCount = {}
+    
+    // Count occurrences of each source IP
+    apiStore.logs.forEach(log => {
+      const ip = log.source_ip || log.ip_address
+      if (ip && ip !== '0.0.0.0' && ip !== 'Unknown') {
+        ipCount[ip] = (ipCount[ip] || 0) + 1
+      }
+    })
+    
+    // Convert to array and sort by count
+    return Object.entries(ipCount)
+      .map(([ip, count]) => ({ ip, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+  }
+  
+  return []
 })
 
 const endpointList = computed(() => {
@@ -442,6 +493,24 @@ const getSeverityClass = (count) => {
 
 const formatTime = (timestamp) => {
   return new Date(timestamp).toLocaleString()
+}
+
+const getSeverityClassFromSeverity = (severity) => {
+  if (!severity) return 'low'
+  const s = String(severity).toLowerCase().trim()
+  if (s.includes('critical')) return 'critical'
+  if (s.includes('high')) return 'high'
+  if (s.includes('medium')) return 'medium'
+  return 'low'
+}
+
+const getSeverityLabel = (severity) => {
+  if (!severity) return 'Low'
+  const s = String(severity).toLowerCase().trim()
+  if (s.includes('critical')) return 'Critical'
+  if (s.includes('high')) return 'High'
+  if (s.includes('medium')) return 'Medium'
+  return 'Low'
 }
 
 const exportEndpoints = () => {

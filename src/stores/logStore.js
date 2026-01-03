@@ -16,18 +16,13 @@ export const useLogStore = defineStore('logs', () => {
       const logsArray = response.data || (Array.isArray(response) ? response : [])
       allLogs.value = logsArray
 
-      // If no real data, use mock data
-      if (allLogs.value.length === 0) {
-        console.warn('Real logs empty, using mock data for "All" tab')
-        allLogs.value = [...generateMockLogs(100), ...generateMockRegistryLogs(20)]
-      }
-
+      // If no real data, keep the list empty (no samples)
       return response
     } catch (error) {
       console.error('Failed to fetch all logs:', error)
-      // Fallback to mock data if backend fails
-      allLogs.value = [...generateMockLogs(1000), ...generateMockRegistryLogs(200)]
-      return { data: allLogs.value }
+      // Do not use mock data; expose empty list
+      allLogs.value = []
+      return { data: [] }
     }
   }
 
@@ -155,9 +150,8 @@ export const useLogStore = defineStore('logs', () => {
       if (logsArray.length > 0) {
         logs.value = logsArray
       } else {
-        // Fallback to mock data if no real data available
-        console.warn('No real data from MongoDB, using mock data')
-        logs.value = generateMockLogs(1000)
+        // Keep empty if no real data available (no samples)
+        logs.value = []
       }
 
       // Fetch tailscale logs
@@ -167,22 +161,22 @@ export const useLogStore = defineStore('logs', () => {
         if (tsLogs.length > 0) {
           tailscaleLogs.value = tsLogs
         } else {
-          tailscaleLogs.value = generateMockTailscaleLogs(500)
+          tailscaleLogs.value = []
         }
       } catch (error) {
-        console.warn('Failed to fetch tailscale logs, using mock data:', error)
-        tailscaleLogs.value = generateMockTailscaleLogs(500)
+        console.warn('Failed to fetch tailscale logs:', error)
+        tailscaleLogs.value = []
       }
 
       // Generate registry logs (these are typically system-generated)
-      registryLogs.value = generateMockRegistryLogs(200)
+      registryLogs.value = []
 
     } catch (error) {
-      console.error('Failed to fetch real logs from MongoDB, using mock data:', error)
-      // Fallback to mock data if API fails
-      logs.value = generateMockLogs(1000)
-      tailscaleLogs.value = generateMockTailscaleLogs(500)
-      registryLogs.value = generateMockRegistryLogs(200)
+      console.error('Failed to fetch real logs from MongoDB:', error)
+      // Do not fallback to mock data if API fails
+      logs.value = []
+      tailscaleLogs.value = []
+      registryLogs.value = []
     }
   }
 

@@ -6,6 +6,30 @@ import { enrichGeoData, enrichGeoDataBatch } from '../middleware/geoip.js'
 
 const router = express.Router()
 
+// Helper function to normalize severity values
+const normalizeSeverity = (severity) => {
+  if (!severity) return 'Low'
+  const s = String(severity).toLowerCase().trim()
+  if (s.includes('critical')) return 'Critical'
+  if (s.includes('high')) return 'High'
+  if (s.includes('medium')) return 'Medium'
+  return 'Low'
+}
+
+// Helper function to normalize log data
+const normalizeLogData = (log) => {
+  const doc = log.toObject ? log.toObject() : log;
+  return {
+    ...doc,
+    timestamp: doc.timestamp || doc.ingested_at || doc.created_at || doc.createdAt,
+    severity: normalizeSeverity(doc.severity || doc.metadata?.severity || doc.raw_data?.severity),
+    log_type: doc.log_type || doc.metadata?.log_source || doc.raw_data?.log_source || 'System',
+    endpoint: doc.endpoint || doc.metadata?.endpoint_name || doc.raw_data?.endpoint_name || 'Unknown',
+    source_ip: doc.source_ip || doc.ip_address || doc.metadata?.ip_address || doc.raw_data?.src_ip || '0.0.0.0',
+    dest_ip: doc.dest_ip || doc.raw_data?.dst_ip || '0.0.0.0'
+  }
+}
+
 /**
  * POST /api/logs/ingest
  * Accept JSON logs from various sources
@@ -104,18 +128,7 @@ router.get('/', async (req, res) => {
       .skip(skip)
       .limit(limit)
 
-    const normalizedLogs = logs.map(log => {
-      const doc = log.toObject();
-      return {
-        ...doc,
-        timestamp: doc.timestamp || doc.ingested_at || doc.created_at || doc.createdAt,
-        severity: doc.severity || doc.metadata?.severity || doc.raw_data?.severity || 'Low',
-        log_type: doc.log_type || doc.metadata?.log_source || doc.raw_data?.log_source || 'System',
-        endpoint: doc.endpoint || doc.metadata?.endpoint_name || doc.raw_data?.endpoint_name || 'Unknown',
-        source_ip: doc.source_ip || doc.ip_address || doc.metadata?.ip_address || doc.raw_data?.src_ip || '0.0.0.0',
-        dest_ip: doc.dest_ip || doc.raw_data?.dst_ip || '0.0.0.0'
-      }
-    });
+    const normalizedLogs = logs.map(normalizeLogData);
 
     res.json({
       data: normalizedLogs,
@@ -140,28 +153,80 @@ router.get('/recent', async (req, res) => {
     const severity = req.query.severity
     const logType = req.query.logType
 
-    let query = {}
-    if (severity) query.severity = severity
-    if (logType) query.log_type = logType
-
-    const logs = await Log.find(query)
-      .sort({ timestamp: -1 })
-      .limit(limit)
-
-    const normalizedLogs = logs.map(log => {
-      const doc = log.toObject();
-      return {
-        ...doc,
-        timestamp: doc.timestamp || doc.ingested_at || doc.created_at || doc.createdAt,
-        severity: doc.severity || doc.metadata?.severity || doc.raw_data?.severity || 'Low',
-        log_type: doc.log_type || doc.metadata?.log_source || doc.raw_data?.log_source || 'System',
-        endpoint: doc.endpoint || doc.metadata?.endpoint_name || doc.raw_data?.endpoint_name || 'Unknown',
-        source_ip: doc.source_ip || doc.ip_address || doc.metadata?.ip_address || doc.raw_data?.src_ip || '0.0.0.0',
-        dest_ip: doc.dest_ip || doc.raw_data?.dst_ip || '0.0.0.0'
+    // Use aggregation for proper normalization
+    const pipeline = [
+      {
+        $addFields: {
+          normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
+          rawSeverity: { 
+            $toString: { 
+              $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Low'] 
+            } 
+          },
+          normSourceIP: { $ifNull: ['$source_ip', '$ip_address', '$metadata.ip_address', '$raw_data.src_ip', '$raw.source_ip', 'Unknown'] },
+          normDestIP: { $ifNull: ['$dest_ip', '$raw_data.dst_ip', '$raw.dest_ip', 'Unknown'] },
+          normLogType: { $ifNull: ['$log_type', '$metadata.log_source', '$raw_data.log_source', '$raw.log_type', 'System'] },
+          normEndpoint: { $ifNull: ['$endpoint', '$metadata.endpoint_name', '$raw_data.endpoint_name', '$raw.endpoint', 'Unknown'] }
+        }
+      },
+      {
+        $addFields: {
+          lowerSeverity: { $toLower: '$rawSeverity' }
+        }
+      },
+      {
+        $addFields: {
+          normSeverity: {
+            $switch: {
+              branches: [
+                { case: { $regexMatch: { input: '$lowerSeverity', regex: /critical/i } }, then: 'Critical' },
+                { case: { $regexMatch: { input: '$lowerSeverity', regex: /high/i } }, then: 'High' },
+                { case: { $regexMatch: { input: '$lowerSeverity', regex: /medium/i } }, then: 'Medium' },
+                { case: { $regexMatch: { input: '$lowerSeverity', regex: /low/i } }, then: 'Low' }
+              ],
+              default: 'Low'
+            }
+          }
+        }
       }
-    });
+    ]
 
-    res.json({ data: normalizedLogs, total: normalizedLogs.length })
+    // Add filters if provided
+    const matchConditions = {}
+    if (severity) matchConditions.normSeverity = severity
+    if (logType) matchConditions.normLogType = logType
+    
+    if (Object.keys(matchConditions).length > 0) {
+      pipeline.push({ $match: matchConditions })
+    }
+
+    pipeline.push(
+      { $sort: { normTimestamp: -1 } },
+      { $limit: limit },
+      {
+        $project: {
+          _id: 1,
+          id: '$_id',
+          timestamp: '$normTimestamp',
+          severity: '$normSeverity',
+          source_ip: '$normSourceIP',
+          dest_ip: '$normDestIP',
+          log_type: '$normLogType',
+          endpoint: '$normEndpoint',
+          raw: 1,
+          raw_data: 1,
+          metadata: 1,
+          geo: 1,
+          protocol: { $ifNull: ['$raw.protocol', '$raw_data.protocol', '$protocol', 'N/A'] },
+          port: { $ifNull: ['$raw.port', '$raw_data.port', '$port', 'N/A'] },
+          action: { $ifNull: ['$raw.action', '$raw_data.action', '$action', 'N/A'] }
+        }
+      }
+    )
+
+    const logs = await Log.aggregate(pipeline)
+
+    res.json({ data: logs, total: logs.length })
   } catch (error) {
     console.error('Error fetching recent logs:', error)
     res.status(500).json({ error: error.message })
@@ -195,8 +260,23 @@ router.get('/geo', async (req, res) => {
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          normSeverity: { $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Low'] },
+          rawSeverity: { $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Low'] },
           normSourceIP: { $ifNull: ['$source_ip', '$ip_address', '$metadata.ip_address', '$raw_data.src_ip', '$raw.source_ip', '$source.ip', '$client.ip', 'Unknown'] }
+        }
+      },
+      {
+        $addFields: {
+          normSeverity: {
+            $switch: {
+              branches: [
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'critical'] }, 0] }, then: 'Critical' },
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'high'] }, 0] }, then: 'High' },
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'medium'] }, 0] }, then: 'Medium' },
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'low'] }, 0] }, then: 'Low' }
+              ],
+              default: 'Low'
+            }
+          }
         }
       },
       {
@@ -208,10 +288,10 @@ router.get('/geo', async (req, res) => {
       {
         $group: {
           _id: {
-            country: { $ifNull: ['$geo.country', 'India'] },
-            city: { $ifNull: ['$geo.city', 'Mumbai'] },
-            lat: { $ifNull: ['$geo.lat', '$geo.latitude', 19.0760] },
-            lon: { $ifNull: ['$geo.lon', '$geo.longitude', 72.8777] }
+            country: { $ifNull: ['$geo.country', 'Unknown'] },
+            city: { $ifNull: ['$geo.city', 'Unknown'] },
+            lat: { $ifNull: ['$geo.lat', '$geo.latitude', 0] },
+            lon: { $ifNull: ['$geo.lon', '$geo.longitude', 0] }
           },
           count: { $sum: 1 },
           critical: { $sum: { $cond: [{ $eq: ['$normSeverity', 'Critical'] }, 1, 0] } },
@@ -233,10 +313,10 @@ router.get('/geo', async (req, res) => {
       {
         $group: {
           _id: {
-            country: { $ifNull: ['$source.geo.country_name', 'India'] },
-            city: { $ifNull: ['$source.geo.city_name', 'Mumbai'] },
-            lat: { $ifNull: ['$source.geo.location.lat', 19.0760] },
-            lon: { $ifNull: ['$source.geo.location.lon', 72.8777] }
+            country: { $ifNull: ['$source.geo.country_name', 'Unknown'] },
+            city: { $ifNull: ['$source.geo.city_name', 'Unknown'] },
+            lat: { $ifNull: ['$source.geo.location.lat', 0] },
+            lon: { $ifNull: ['$source.geo.location.lon', 0] }
           },
           count: { $sum: 1 },
           critical: { $sum: { $cond: [{ $eq: ['$event.severity', 'Critical'] }, 1, 0] } },
@@ -280,9 +360,10 @@ router.get('/geo', async (req, res) => {
 
     // Fallback logic if still empty
     if (geoMap.size === 0) {
-      // Create some India-centric samples if no data to show something
-      geoMap.set('India-Mumbai', { country: 'India', city: 'Mumbai', lat: 19.0760, lon: 72.8777, count: 0, critical: 0, high: 0, medium: 0, low: 0 })
-      geoMap.set('India-Delhi', { country: 'India', city: 'Delhi', lat: 28.6139, lon: 77.2090, count: 0, critical: 0, high: 0, medium: 0, low: 0 })
+      // Create some global samples if no data to show something
+      geoMap.set('United States-New York', { country: 'United States', city: 'New York', lat: 40.7128, lon: -74.0060, count: 0, critical: 0, high: 0, medium: 0, low: 0 })
+      geoMap.set('United Kingdom-London', { country: 'United Kingdom', city: 'London', lat: 51.5074, lon: -0.1278, count: 0, critical: 0, high: 0, medium: 0, low: 0 })
+      geoMap.set('Germany-Berlin', { country: 'Germany', city: 'Berlin', lat: 52.5200, lon: 13.4050, count: 0, critical: 0, high: 0, medium: 0, low: 0 })
     }
 
     res.json({ success: true, data: Array.from(geoMap.values()) })
@@ -312,27 +393,31 @@ router.get('/ip/:ip', async (req, res) => {
       ],
       timestamp: { $gte: since }
     })
-    const normalizedLogs = logs.map(log => {
-      const doc = log.toObject();
-      return {
-        ...doc,
-        timestamp: doc.timestamp || doc.ingested_at || doc.created_at || doc.createdAt,
-        severity: doc.severity || doc.metadata?.severity || doc.raw_data?.severity || 'Low',
-        log_type: doc.log_type || doc.metadata?.log_source || doc.raw_data?.log_source || 'System',
-        endpoint: doc.endpoint || doc.metadata?.endpoint_name || doc.raw_data?.endpoint_name || 'Unknown',
-        source_ip: doc.source_ip || doc.ip_address || doc.metadata?.ip_address || doc.raw_data?.src_ip || '0.0.0.0',
-        dest_ip: doc.dest_ip || doc.raw_data?.dst_ip || '0.0.0.0'
-      }
-    });
+    const normalizedLogs = logs.map(normalizeLogData);
 
     // Aggregate stats with normalization
     const stats = await Log.aggregate([
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          normSeverity: { $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Low'] },
+          rawSeverity: { $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Low'] },
           normSourceIP: { $ifNull: ['$source_ip', '$ip_address', '$metadata.ip_address', '$raw_data.src_ip', '$raw.source_ip', '$source.ip', '$client.ip', 'Unknown'] },
           normDestIP: { $ifNull: ['$dest_ip', '$raw_data.dst_ip', '$raw.dest_ip', '$destination.ip', '$server.ip', 'Unknown'] }
+        }
+      },
+      {
+        $addFields: {
+          normSeverity: {
+            $switch: {
+              branches: [
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'critical'] }, 0] }, then: 'Critical' },
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'high'] }, 0] }, then: 'High' },
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'medium'] }, 0] }, then: 'Medium' },
+                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'low'] }, 0] }, then: 'Low' }
+              ],
+              default: 'Low'
+            }
+          }
         }
       },
       {
@@ -380,31 +465,73 @@ router.get('/severity/:level', async (req, res) => {
     const { level } = req.params
     const limit = Math.min(parseInt(req.query.limit) || 100, 1000)
 
-    const logs = await Log.find({
-      $or: [
-        { severity: level },
-        { 'metadata.severity': level },
-        { 'raw_data.severity': level },
-        { 'raw.severity': level }
-      ]
-    })
-      .sort({ timestamp: -1 })
-      .limit(limit)
-
-    const normalizedLogs = logs.map(log => {
-      const doc = log.toObject();
-      return {
-        ...doc,
-        timestamp: doc.timestamp || doc.ingested_at || doc.created_at || doc.createdAt,
-        severity: doc.severity || doc.metadata?.severity || doc.raw_data?.severity || 'Low',
-        log_type: doc.log_type || doc.metadata?.log_source || doc.raw_data?.log_source || 'System',
-        endpoint: doc.endpoint || doc.metadata?.endpoint_name || doc.raw_data?.endpoint_name || 'Unknown',
-        source_ip: doc.source_ip || doc.ip_address || doc.metadata?.ip_address || doc.raw_data?.src_ip || '0.0.0.0',
-        dest_ip: doc.dest_ip || doc.raw_data?.dst_ip || '0.0.0.0'
+    // Use aggregation to properly normalize and match severity
+    const logs = await Log.aggregate([
+      {
+        $addFields: {
+          normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
+          rawSeverity: { 
+            $toString: { 
+              $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Low'] 
+            } 
+          },
+          normSourceIP: { $ifNull: ['$source_ip', '$ip_address', '$metadata.ip_address', '$raw_data.src_ip', '$raw.source_ip', 'Unknown'] },
+          normDestIP: { $ifNull: ['$dest_ip', '$raw_data.dst_ip', '$raw.dest_ip', 'Unknown'] },
+          normLogType: { $ifNull: ['$log_type', '$metadata.log_source', '$raw_data.log_source', '$raw.log_type', 'System'] },
+          normEndpoint: { $ifNull: ['$endpoint', '$metadata.endpoint_name', '$raw_data.endpoint_name', '$raw.endpoint', 'Unknown'] }
+        }
+      },
+      {
+        $addFields: {
+          lowerSeverity: { $toLower: '$rawSeverity' }
+        }
+      },
+      {
+        $addFields: {
+          normSeverity: {
+            $switch: {
+              branches: [
+                { case: { $regexMatch: { input: '$lowerSeverity', regex: /critical/i } }, then: 'Critical' },
+                { case: { $regexMatch: { input: '$lowerSeverity', regex: /high/i } }, then: 'High' },
+                { case: { $regexMatch: { input: '$lowerSeverity', regex: /medium/i } }, then: 'Medium' },
+                { case: { $regexMatch: { input: '$lowerSeverity', regex: /low/i } }, then: 'Low' }
+              ],
+              default: 'Low'
+            }
+          }
+        }
+      },
+      {
+        $match: { normSeverity: level }
+      },
+      {
+        $sort: { normTimestamp: -1 }
+      },
+      {
+        $limit: limit
+      },
+      {
+        $project: {
+          _id: 1,
+          id: '$_id',
+          timestamp: '$normTimestamp',
+          severity: '$normSeverity',
+          source_ip: '$normSourceIP',
+          dest_ip: '$normDestIP',
+          log_type: '$normLogType',
+          endpoint: '$normEndpoint',
+          raw: 1,
+          raw_data: 1,
+          metadata: 1,
+          geo: 1,
+          protocol: { $ifNull: ['$raw.protocol', '$raw_data.protocol', '$protocol', 'N/A'] },
+          port: { $ifNull: ['$raw.port', '$raw_data.port', '$port', 'N/A'] },
+          action: { $ifNull: ['$raw.action', '$raw_data.action', '$action', 'N/A'] }
+        }
       }
-    });
+    ])
 
-    res.json({ data: normalizedLogs, total: normalizedLogs.length })
+    res.json({ data: logs, total: logs.length })
   } catch (error) {
     console.error('Error fetching severity logs:', error)
     res.status(500).json({ error: error.message })

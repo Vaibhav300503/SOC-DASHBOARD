@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogTypes Test</title>
+</head>
+<body>
+    <h1>LogTypes Page Test</h1>
+    <p>This is a simple test to verify LogTypes functionality:</p>
+    
+    <h2>Test Cases:</h2>
+    <ol>
+        <li><strong>Severity Filtering:</strong> Click on severity buttons (Critical, High, Medium, Low) - logs should filter correctly</li>
+        <li><strong>Log Type Filtering:</strong> Select different log types from dropdown - should show relevant logs</li>
+        <li><strong>Search Functionality:</strong> Enter IP address in Source IP field and click Apply Filters</li>
+        <li><strong>Empty States:</strong> When no data matches filters, should show "No logs available" message</li>
+        <li><strong>Severity Counts:</strong> Should use backend data from apiStore.severityBreakdown</li>
+    </ol>
+    
+    <h2>Expected Behavior:</h2>
+    <ul>
+        <li>✅ Severity buttons should highlight when selected</li>
+        <li>✅ Filtered logs count should update in table header</li>
+        <li>✅ Empty state should show when no logs match filters</li>
+        <li>✅ Search button should work and show loading state</li>
+        <li>✅ Severity distribution chart should show real data</li>
+    </ul>
+    
+    <p><strong>Navigate to:</strong> <a href="http://localhost:5173/#/log-types" target="_blank">http://localhost:5173/#/log-types</a></p>
+</body>
+</html>
