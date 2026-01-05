@@ -61,8 +61,8 @@
               @change="updateFilter('timeRange', $event.target.value)"
               class="input-cyber w-full"
             >
-              <option value="24h">Last 24 Hours</option>
               <option value="7d">Last 7 Days</option>
+              <option value="24h">Last 24 Hours</option>
               <option value="30d">Last 30 Days</option>
               <option value="all">All Time</option>
             </select>
@@ -252,7 +252,7 @@ const copiedIndividualId = ref(null)
 const useRegex = ref(false)
 
 onMounted(async () => {
-  await apiStore.fetchRecentLogs(1000)
+  await apiStore.fetchRecentLogs()
   await apiStore.fetchDashboardStats()
 })
 

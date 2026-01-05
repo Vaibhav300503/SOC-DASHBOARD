@@ -1,26 +1,26 @@
 <template>
   <aside
     :class="[
-      'fixed left-0 top-0 h-screen bg-gradient-to-r from-slate-800/50 to-slate-700/50 border-r border-cyan-500/20',
+      'fixed left-0 top-0 h-screen bg-app-secondary border-r border-card-border-default',
       'transition-all duration-sidebar z-40',
       isCollapsed ? 'w-sidebar-collapsed' : 'w-sidebar-expanded',
       'flex flex-col overflow-hidden backdrop-blur-sm'
     ]"
   >
     <!-- Logo Section -->
-    <div class="flex items-center justify-between h-16 px-4 border-b border-cyan-500/20 bg-gradient-to-r from-slate-800/30 to-slate-700/30">
+    <div class="flex items-center justify-between h-16 px-4 border-b border-card-border-default bg-card-primary">
       <div
         v-if="!isCollapsed"
         class="flex items-center gap-3 flex-1"
       >
-        <div class="w-8 h-8 bg-gradient-to-br from-cyan-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg shadow-cyan-500/20">
-          <i class="fas fa-shield-alt text-white text-sm"></i>
+        <div class="w-8 h-8 bg-accent-primary rounded-lg flex items-center justify-center">
+          <i class="fas fa-shield-alt text-app-primary text-sm"></i>
         </div>
-        <span class="text-sm font-bold text-slate-50 tracking-tight whitespace-nowrap">SOC</span>
+        <span class="text-sm font-bold text-text-primary-headings tracking-tight whitespace-nowrap">SOC</span>
       </div>
       <button
         @click="toggleSidebar"
-        class="p-2 hover:bg-slate-800/50 rounded-lg transition-colors text-slate-400 hover:text-cyan-400"
+        class="p-2 hover:bg-hover-overlay rounded transition-colors text-icon-default hover:text-icon-active"
         :title="isCollapsed ? 'Expand' : 'Collapse'"
       >
         <i :class="isCollapsed ? 'fas fa-chevron-right' : 'fas fa-chevron-left'" class="text-xs"></i>
@@ -31,82 +31,82 @@
     <SidebarNavigation :isCollapsed="isCollapsed" />
 
     <!-- User Section -->
-    <div class="border-t border-cyan-500/20 p-3 bg-gradient-to-r from-slate-800/30 to-slate-700/30">
+    <div class="border-t border-card-border-default p-3 bg-card-primary">
       <button
         @click="toggleUserMenu"
         :class="[
-          'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg',
-          'hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-purple-600/10 transition-all duration-200 text-slate-400 hover:text-cyan-300'
+          'w-full flex items-center gap-3 px-3 py-2.5 rounded',
+          'hover:bg-hover-overlay transition-all duration-200 text-text-secondary hover:text-accent-primary'
         ]"
       >
-        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-cyan-500/20 relative">
-          <i class="fas fa-user text-white text-xs"></i>
+        <div class="w-8 h-8 rounded-full bg-accent-primary flex items-center justify-center flex-shrink-0 relative">
+          <i class="fas fa-user text-app-primary text-xs"></i>
           <!-- Online indicator -->
-          <div class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-slate-800"></div>
+          <div class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-app-secondary"></div>
         </div>
         <div v-if="!isCollapsed" class="flex-1 text-left min-w-0">
-          <div class="text-xs font-medium text-cyan-300 truncate">{{ userName }}</div>
-          <div class="text-xs text-slate-500 truncate">{{ userRole }}</div>
+          <div class="text-xs font-medium text-accent-primary truncate">{{ userName }}</div>
+          <div class="text-xs text-text-muted truncate">{{ userRole }}</div>
         </div>
-        <i v-if="!isCollapsed" class="fas fa-chevron-down text-xs flex-shrink-0 text-cyan-400"></i>
+        <i v-if="!isCollapsed" class="fas fa-chevron-down text-xs flex-shrink-0 text-accent-primary"></i>
       </button>
 
       <!-- User Menu Dropdown -->
       <div
         v-if="showUserMenu && !isCollapsed"
-        class="mt-2 bg-gradient-to-r from-slate-800/70 to-slate-700/70 rounded-lg border border-cyan-500/20 overflow-hidden backdrop-blur-sm"
+        class="mt-2 bg-card-secondary rounded border border-card-border-default overflow-hidden backdrop-blur-sm"
       >
         <!-- Profile Stats (Mini Version) -->
-        <div class="px-3 py-2 border-b border-cyan-500/20">
+        <div class="px-3 py-2 border-b border-card-border-default">
           <div class="grid grid-cols-3 gap-2 text-center">
             <div>
-              <div class="text-xs font-bold text-cyan-400">24</div>
-              <div class="text-xs text-slate-500">Logins</div>
+              <div class="text-xs font-bold text-accent-primary">24</div>
+              <div class="text-xs text-text-muted">Logins</div>
             </div>
             <div>
-              <div class="text-xs font-bold text-green-400">12</div>
-              <div class="text-xs text-slate-500">Alerts</div>
+              <div class="text-xs font-bold text-green-500">12</div>
+              <div class="text-xs text-text-muted">Alerts</div>
             </div>
             <div>
               <div class="text-xs font-bold text-purple-400">8</div>
-              <div class="text-xs text-slate-500">Reports</div>
+              <div class="text-xs text-text-muted">Reports</div>
             </div>
           </div>
         </div>
 
         <button
           @click="handleProfile"
-          class="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors"
+          class="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-secondary hover:text-accent-primary hover:bg-hover-overlay transition-colors"
         >
           <i class="fas fa-user-circle"></i>
           <span>View Profile</span>
         </button>
         <button
           @click="handleSettings"
-          class="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors"
+          class="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-secondary hover:text-accent-primary hover:bg-hover-overlay transition-colors"
         >
           <i class="fas fa-cog"></i>
           <span>Settings</span>
         </button>
         <button
           @click="handleActivity"
-          class="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors"
+          class="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-secondary hover:text-accent-primary hover:bg-hover-overlay transition-colors"
         >
           <i class="fas fa-chart-line"></i>
           <span>Activity</span>
         </button>
         <button
           @click="handleSecurity"
-          class="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors"
+          class="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-secondary hover:text-accent-primary hover:bg-hover-overlay transition-colors"
         >
           <i class="fas fa-shield-alt"></i>
           <span>Security</span>
-          <span class="ml-auto text-xs bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">2FA</span>
+          <span class="ml-auto text-xs bg-yellow-600/30 text-yellow-500 px-1.5 py-0.5 rounded">2FA</span>
         </button>
-        <div class="border-t border-cyan-500/20"></div>
+        <div class="border-t border-card-border-default"></div>
         <button
           @click="handleLogout"
-          class="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+          class="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-colors"
         >
           <i class="fas fa-sign-out-alt"></i>
           <span>Logout</span>
@@ -185,11 +185,12 @@ const handleSecurity = () => {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 225, 255, 0.2);
+  background: var(--accent-primary);
   border-radius: 3px;
+  opacity: 0.3;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 225, 255, 0.4);
+  opacity: 0.6;
 }
 </style>

@@ -246,7 +246,7 @@ const searchResults = ref(null)
 const showResults = ref(false)
 
 onMounted(async () => {
-  await apiStore.fetchRecentLogs(1000)
+  await apiStore.fetchRecentLogs()
 })
 
 const uniqueIPs = computed(() => {

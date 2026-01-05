@@ -1,51 +1,65 @@
 import mongoose from 'mongoose'
 
 const caseSchema = new mongoose.Schema({
-  case_id: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
-  thehive_case_id: {
-    type: Number,
-    index: true
-  },
-  alert_ids: [{
-    type: String,
-    index: true
-  }],
   title: {
     type: String,
     required: true
   },
-  description: String,
-  severity: {
+  description: {
     type: String,
-    enum: ['Critical', 'High', 'Medium', 'Low'],
-    required: true,
-    index: true
+    default: ''
+  },
+  severity: {
+    type: Number,
+    default: 1,
+    min: 0,
+    max: 4
   },
   status: {
     type: String,
-    enum: ['Open', 'In Progress', 'Closed', 'Resolved'],
-    default: 'Open',
-    index: true
+    enum: ['Open', 'InProgress', 'Resolved', 'Closed'],
+    default: 'Open'
   },
+  owner: {
+    type: String,
+    default: 'Unassigned'
+  },
+  source: {
+    type: String,
+    enum: ['TheHive', 'MongoDB', 'Manual'],
+    default: 'MongoDB'
+  },
+  thehive_id: {
+    type: String,
+    sparse: true
+  },
+  tags: [{
+    type: String
+  }],
+  artifacts: [{
+    dataType: String,
+    data: String,
+    message: String
+  }],
   created_at: {
     type: Date,
-    default: Date.now,
-    index: true
+    default: Date.now
   },
   updated_at: {
     type: Date,
-    default: Date.now,
-    index: true
+    default: Date.now
   },
-  created_by: mongoose.Schema.Types.ObjectId,
-  assigned_to: mongoose.Schema.Types.ObjectId,
-  tags: [String],
-  metadata: mongoose.Schema.Types.Mixed
+  created_by: {
+    type: String,
+    default: 'system'
+  }
+}, {
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 })
+
+// Index for performance
+caseSchema.index({ created_at: -1 })
+caseSchema.index({ status: 1 })
+caseSchema.index({ severity: -1 })
 
 export default mongoose.model('Case', caseSchema)

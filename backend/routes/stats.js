@@ -4,6 +4,7 @@ import TailscaleLog from '../models/TailscaleLog.js'
 import Event from '../models/Event.js'
 import Agent from '../models/Agent.js'
 import Case from '../models/Case.js'
+import { STANDARD_LOG_TYPES } from '../config/logTypeMappings.js'
 
 const router = express.Router()
 
@@ -19,7 +20,7 @@ const normalizeSeverity = (severity) => {
 
 /**
  * GET /api/stats/dashboard
- * Get dashboard statistics
+ * Get dashboard statistics - FIXED to use MongoDB as single source of truth
  */
 router.get('/dashboard', async (req, res) => {
   try {
@@ -34,9 +35,9 @@ router.get('/dashboard', async (req, res) => {
     const hoursAgo = hoursMap[timeRange] || 24
     const since = new Date(Date.now() - hoursAgo * 60 * 60 * 1000)
 
-    // Get data from Log, Event, Case and Agent collections
+    // Get total counts from all collections
     const [totalLogs, totalEvents, totalCases, totalAgents] = await Promise.all([
-      Log.countDocuments({
+      timeRange === 'all' ? Log.countDocuments({}) : Log.countDocuments({
         $or: [
           { timestamp: { $gte: since } },
           { ingested_at: { $gte: since } },
@@ -44,47 +45,47 @@ router.get('/dashboard', async (req, res) => {
           { created_at: { $gte: since } }
         ]
       }),
-      Event.countDocuments({ '@timestamp': { $gte: since } }),
-      Case.countDocuments({ created_at: { $gte: since } }),
+      timeRange === 'all' ? Event.countDocuments({}) : Event.countDocuments({ '@timestamp': { $gte: since } }),
+      timeRange === 'all' ? Case.countDocuments({}) : Case.countDocuments({ created_at: { $gte: since } }),
       Agent.countDocuments()
     ])
 
-    // Severity breakdown from Log collection with normalized fields
-    const logSeverityBreakdown = await Log.aggregate([
+    // Severity breakdown from Log collection with proper field mapping
+    const logSeverityPipeline = [
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          rawSeverity: { $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Low'] }
-        }
-      },
-      { $match: { normTimestamp: { $gte: since } } },
-      {
-        $addFields: {
-          lowerSeverity: { $toLower: { $toString: '$rawSeverity' } },
-          normSeverity: {
+          // Assign severity based on log source since all DB severities are null
+          assignedSeverity: {
             $switch: {
               branches: [
-                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'critical'] }, 0] }, then: 'Critical' },
-                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'high'] }, 0] }, then: 'High' },
-                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'medium'] }, 0] }, then: 'Medium' },
-                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'low'] }, 0] }, then: 'Low' }
+                { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /security|intrusion|malware|Security/i } }, then: 'High' },
+                { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /error|fail|critical|kernel/i } }, then: 'Medium' }
               ],
               default: 'Low'
             }
           }
         }
-      },
-      {
-        $group: {
-          _id: '$normSeverity',
-          count: { $sum: 1 }
-        }
       }
-    ])
+    ]
+
+    if (timeRange !== 'all') {
+      logSeverityPipeline.push({ $match: { normTimestamp: { $gte: since } } })
+    }
+
+    logSeverityPipeline.push({
+      $group: {
+        _id: '$assignedSeverity',
+        count: { $sum: 1 }
+      }
+    })
+
+    const logSeverityBreakdown = await Log.aggregate(logSeverityPipeline)
 
     // Severity breakdown from Cases collection
+    const caseSeverityQuery = timeRange === 'all' ? {} : { created_at: { $gte: since } }
     const caseSeverityBreakdown = await Case.aggregate([
-      { $match: { created_at: { $gte: since } } },
+      { $match: caseSeverityQuery },
       {
         $group: {
           _id: '$severity',
@@ -112,8 +113,9 @@ router.get('/dashboard', async (req, res) => {
     }))
 
     // Event action breakdown from Event collection
+    const eventActionQuery = timeRange === 'all' ? {} : { '@timestamp': { $gte: since } }
     const eventActionBreakdown = await Event.aggregate([
-      { $match: { '@timestamp': { $gte: since } } },
+      { $match: eventActionQuery },
       {
         $group: {
           _id: '$event.action',
@@ -124,32 +126,71 @@ router.get('/dashboard', async (req, res) => {
       { $limit: 10 }
     ])
 
-    // Log type breakdown with normalized fields
-    const logTypeBreakdown = await Log.aggregate([
+    // Log type breakdown with standardized fields
+    const logTypePipeline = [
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          normLogType: { $ifNull: ['$log_type', '$metadata.log_source', '$raw_data.log_source', '$raw.log_type', '$raw.type', 'Unknown'] }
-        }
-      },
-      { $match: { normTimestamp: { $gte: since } } },
-      {
-        $group: {
-          _id: '$normLogType',
-          count: { $sum: 1 }
+          // Use standardized log_type if available, otherwise classify on-the-fly
+          standardizedLogType: {
+            $cond: {
+              if: { $ne: ['$log_type', null] },
+              then: '$log_type',
+              else: {
+                $switch: {
+                  branches: [
+                    // Authentication
+                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /unified.*auth|windows.*auth|authentication/i } }, then: 'auth' },
+                    // Network
+                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /network.*snapshot|network.*monitor|tailscale/i } }, then: 'network' },
+                    // Firewall
+                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /firewall/i } }, then: 'firewall' },
+                    // Application
+                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /application|nginx|apache|web.*api/i } }, then: 'application' },
+                    // Database
+                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /database|sql|mysql|postgres|mongodb/i } }, then: 'database' },
+                    // Registry
+                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /registry|reg|hkey/i } }, then: 'registry' },
+                    // FIM
+                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /fim|file.*integrity/i } }, then: 'fim' }
+                  ],
+                  default: 'system'
+                }
+              }
+            }
+          }
         }
       }
-    ])
+    ]
+
+    if (timeRange !== 'all') {
+      logTypePipeline.push({ $match: { normTimestamp: { $gte: since } } })
+    }
+
+    logTypePipeline.push({
+      $group: {
+        _id: '$standardizedLogType',
+        count: { $sum: 1 }
+      }
+    })
+
+    const logTypeBreakdown = await Log.aggregate(logTypePipeline)
 
     // Top endpoints with normalized fields
-    const topEndpoints = await Log.aggregate([
+    const topEndpointsPipeline = [
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
           normEndpoint: { $ifNull: ['$endpoint', '$metadata.endpoint_name', '$raw_data.endpoint_name', '$raw.endpoint', 'Unknown'] }
         }
-      },
-      { $match: { normTimestamp: { $gte: since } } },
+      }
+    ]
+
+    if (timeRange !== 'all') {
+      topEndpointsPipeline.push({ $match: { normTimestamp: { $gte: since } } })
+    }
+
+    topEndpointsPipeline.push(
       {
         $group: {
           _id: '$normEndpoint',
@@ -159,32 +200,43 @@ router.get('/dashboard', async (req, res) => {
       { $match: { _id: { $ne: null } } },
       { $sort: { count: -1 } },
       { $limit: 10 }
-    ])
+    )
+
+    const topEndpoints = await Log.aggregate(topEndpointsPipeline)
 
     // Top source IPs from both collections
+    const topSourceIPsFromLogsPipeline = [
+      {
+        $addFields: {
+          normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
+          normSourceIP: {
+            $ifNull: ['$source_ip', '$ip_address', '$metadata.ip_address', '$raw_data.src_ip', '$raw.source_ip', '$source.ip', '$client.ip', 'Unknown']
+          }
+        }
+      }
+    ]
+
+    if (timeRange !== 'all') {
+      topSourceIPsFromLogsPipeline.push({ $match: { normTimestamp: { $gte: since } } })
+    }
+
+    topSourceIPsFromLogsPipeline.push(
+      {
+        $group: {
+          _id: '$normSourceIP',
+          count: { $sum: 1 }
+        }
+      },
+      { $match: { _id: { $ne: null } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    )
+
+    const eventSourceIPsQuery = timeRange === 'all' ? {} : { '@timestamp': { $gte: since } }
     const [topSourceIPsFromLogs, topSourceIPsFromEvents] = await Promise.all([
-      Log.aggregate([
-        {
-          $addFields: {
-            normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-            normSourceIP: {
-              $ifNull: ['$source_ip', '$ip_address', '$metadata.ip_address', '$raw_data.src_ip', '$raw.source_ip', '$source.ip', '$client.ip', 'Unknown']
-            }
-          }
-        },
-        { $match: { normTimestamp: { $gte: since } } },
-        {
-          $group: {
-            _id: '$normSourceIP',
-            count: { $sum: 1 }
-          }
-        },
-        { $match: { _id: { $ne: null } } },
-        { $sort: { count: -1 } },
-        { $limit: 10 }
-      ]),
+      Log.aggregate(topSourceIPsFromLogsPipeline),
       Event.aggregate([
-        { $match: { '@timestamp': { $gte: since } } },
+        { $match: eventSourceIPsQuery },
         {
           $group: {
             _id: { $ifNull: ['$source.ip', '$client.ip', 'Unknown'] },
@@ -208,34 +260,45 @@ router.get('/dashboard', async (req, res) => {
       .slice(0, 10)
 
     // Get unique hosts from events or agents
-    const uniqueHostsFromEvents = await Event.distinct('host.name', { '@timestamp': { $gte: since } })
+    const uniqueHostsFromEvents = timeRange === 'all' 
+      ? await Event.distinct('host.name')
+      : await Event.distinct('host.name', { '@timestamp': { $gte: since } })
     const agentsCount = await Agent.countDocuments({ status: 'active' })
     const uniqueHostsCount = Math.max(uniqueHostsFromEvents.length, agentsCount)
 
     // Get top destination IPs from both collections
+    const topDestIPsFromLogsPipeline = [
+      {
+        $addFields: {
+          normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
+          normDestIP: {
+            $ifNull: ['$dest_ip', '$raw_data.dst_ip', '$raw.dest_ip', '$destination.ip', '$server.ip', 'Unknown']
+          }
+        }
+      }
+    ]
+
+    if (timeRange !== 'all') {
+      topDestIPsFromLogsPipeline.push({ $match: { normTimestamp: { $gte: since } } })
+    }
+
+    topDestIPsFromLogsPipeline.push(
+      {
+        $group: {
+          _id: '$normDestIP',
+          count: { $sum: 1 }
+        }
+      },
+      { $match: { _id: { $ne: null } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    )
+
+    const eventDestIPsQuery = timeRange === 'all' ? {} : { '@timestamp': { $gte: since } }
     const [topDestIPsFromLogs, topDestIPsFromEvents] = await Promise.all([
-      Log.aggregate([
-        {
-          $addFields: {
-            normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-            normDestIP: {
-              $ifNull: ['$dest_ip', '$raw_data.dst_ip', '$raw.dest_ip', '$destination.ip', '$server.ip', 'Unknown']
-            }
-          }
-        },
-        { $match: { normTimestamp: { $gte: since } } },
-        {
-          $group: {
-            _id: '$normDestIP',
-            count: { $sum: 1 }
-          }
-        },
-        { $match: { _id: { $ne: null } } },
-        { $sort: { count: -1 } },
-        { $limit: 10 }
-      ]),
+      Log.aggregate(topDestIPsFromLogsPipeline),
       Event.aggregate([
-        { $match: { '@timestamp': { $gte: since } } },
+        { $match: eventDestIPsQuery },
         {
           $group: {
             _id: { $ifNull: ['$destination.ip', '$server.ip', 'Unknown'] },
@@ -280,45 +343,44 @@ router.get('/dashboard', async (req, res) => {
 
 /**
  * GET /api/stats/severity
- * Get severity statistics
+ * Get severity statistics - FIXED to use MongoDB as single source of truth
  */
 router.get('/severity', async (req, res) => {
   try {
     const timeRange = req.query.timeRange || '24h'
     const hoursAgo = timeRange === '24h' ? 24 : timeRange === '7d' ? 168 : 720
 
-    const since = new Date(Date.now() - hoursAgo * 60 * 60 * 1000)
-
-    const stats = await Log.aggregate([
+    const pipeline = [
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          rawSeverity: { $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Low'] }
-        }
-      },
-      { $match: { normTimestamp: { $gte: since } } },
-      {
-        $addFields: {
-          normSeverity: {
+          // Assign severity based on log source since all DB severities are null
+          assignedSeverity: {
             $switch: {
               branches: [
-                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'critical'] }, 0] }, then: 'Critical' },
-                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'high'] }, 0] }, then: 'High' },
-                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'medium'] }, 0] }, then: 'Medium' },
-                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'low'] }, 0] }, then: 'Low' }
+                { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /security|intrusion|malware|Security/i } }, then: 'High' },
+                { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /error|fail|critical|kernel/i } }, then: 'Medium' }
               ],
               default: 'Low'
             }
           }
         }
-      },
-      {
-        $group: {
-          _id: '$normSeverity',
-          count: { $sum: 1 }
-        }
       }
-    ])
+    ]
+
+    if (timeRange !== 'all') {
+      const since = new Date(Date.now() - hoursAgo * 60 * 60 * 1000)
+      pipeline.push({ $match: { normTimestamp: { $gte: since } } })
+    }
+
+    pipeline.push({
+      $group: {
+        _id: '$assignedSeverity',
+        count: { $sum: 1 }
+      }
+    })
+
+    const stats = await Log.aggregate(pipeline)
 
     // Normalize severity values
     const normalizedStats = stats.map(item => ({
@@ -335,38 +397,37 @@ router.get('/severity', async (req, res) => {
 
 /**
  * GET /api/stats/timeline
- * Get events timeline
+ * Get events timeline - FIXED to use MongoDB as single source of truth
  */
 router.get('/timeline', async (req, res) => {
   try {
     const timeRange = req.query.timeRange || '24h'
     const hoursAgo = timeRange === '24h' ? 24 : timeRange === '7d' ? 168 : 720
 
-    const since = new Date(Date.now() - hoursAgo * 60 * 60 * 1000)
-
-    const timeline = await Log.aggregate([
+    const pipeline = [
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          rawSeverity: { $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Low'] }
-        }
-      },
-      { $match: { normTimestamp: { $gte: since } } },
-      {
-        $addFields: {
-          normSeverity: {
+          // Assign severity based on log source since all DB severities are null
+          assignedSeverity: {
             $switch: {
               branches: [
-                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'critical'] }, 0] }, then: 'Critical' },
-                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'high'] }, 0] }, then: 'High' },
-                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'medium'] }, 0] }, then: 'Medium' },
-                { case: { $gte: [{ $indexOfCP: [{ $toLower: { $toString: '$rawSeverity' } }, 'low'] }, 0] }, then: 'Low' }
+                { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /security|intrusion|malware|Security/i } }, then: 'High' },
+                { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /error|fail|critical|kernel/i } }, then: 'Medium' }
               ],
               default: 'Low'
             }
           }
         }
-      },
+      }
+    ]
+
+    if (timeRange !== 'all') {
+      const since = new Date(Date.now() - hoursAgo * 60 * 60 * 1000)
+      pipeline.push({ $match: { normTimestamp: { $gte: since } } })
+    }
+
+    pipeline.push(
       {
         $group: {
           _id: {
@@ -374,15 +435,23 @@ router.get('/timeline', async (req, res) => {
           },
           count: { $sum: 1 },
           critical: {
-            $sum: { $cond: [{ $eq: ['$normSeverity', 'Critical'] }, 1, 0] }
+            $sum: { $cond: [{ $eq: ['$assignedSeverity', 'Critical'] }, 1, 0] }
           },
           high: {
-            $sum: { $cond: [{ $eq: ['$normSeverity', 'High'] }, 1, 0] }
+            $sum: { $cond: [{ $eq: ['$assignedSeverity', 'High'] }, 1, 0] }
+          },
+          medium: {
+            $sum: { $cond: [{ $eq: ['$assignedSeverity', 'Medium'] }, 1, 0] }
+          },
+          low: {
+            $sum: { $cond: [{ $eq: ['$assignedSeverity', 'Low'] }, 1, 0] }
           }
         }
       },
       { $sort: { _id: 1 } }
-    ])
+    )
+
+    const timeline = await Log.aggregate(pipeline)
 
     res.json({ data: timeline })
   } catch (error) {

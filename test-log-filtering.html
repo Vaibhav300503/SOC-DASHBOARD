@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Type Filtering Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #333; border-radius: 8px; }
+        .log-item { padding: 8px; margin: 4px 0; background: #2a2a2a; border-radius: 4px; }
+        .filter-btn { padding: 8px 16px; margin: 4px; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .filter-btn.active { background: #00aa00; }
+        .debug { background: #333; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>Log Type Filtering Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Data</h2>
+        <div id="testData" class="debug"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Filter Test</h2>
+        <div>
+            <button class="filter-btn active" onclick="filterLogs('All')">All</button>
+            <button class="filter-btn" onclick="filterLogs('Firewall')">Firewall</button>
+            <button class="filter-btn" onclick="filterLogs('IDS')">IDS</button>
+            <button class="filter-btn" onclick="filterLogs('Authentication')">Authentication</button>
+            <button class="filter-btn" onclick="filterLogs('System')">System</button>
+        </div>
+        <div id="filteredResults"></div>
+    </div>
+
+    <script>
+        // Sample test data similar to what actually comes from backend
+        const testLogs = [
+            { log_type: 'UnifiedAuth', severity: 'Low', source_ip: '100.100.83.123', timestamp: new Date() },
+            { log_type: 'windows_defender', severity: 'High', source_ip: '100.77.133.107', timestamp: new Date() },
+            { log_type: 'firewall_logs', severity: 'Critical', source_ip: '172.16.0.1', timestamp: new Date() },
+            { log_type: 'auth_failed', severity: 'Medium', source_ip: '192.168.1.5', timestamp: new Date() },
+            { log_type: 'pfsense', severity: 'High', source_ip: '10.0.0.2', timestamp: new Date() },
+            { log_type: 'system_event', severity: 'Low', source_ip: '192.168.1.10', timestamp: new Date() },
+            { log_type: 'ids_alert', severity: 'Critical', source_ip: '172.16.0.5', timestamp: new Date() },
+            { log_type: 'login_attempt', severity: 'High', source_ip: '192.168.1.20', timestamp: new Date() },
+            { log_type: 'application_error', severity: 'Medium', source_ip: '10.0.0.5', timestamp: new Date() }
+        ];
+
+        // Display test data
+        document.getElementById('testData').innerHTML = JSON.stringify(testLogs, null, 2);
+
+        // Filtering logic (same as in Vue component)
+        function filterLogsByType(logs, selectedType) {
+            if (selectedType === 'All') {
+                return logs;
+            }
+
+            return logs.filter(log => {
+                const logType = log.log_type || 'System';
+                const lowerLogType = logType.toLowerCase();
+                
+                switch (selectedType) {
+                    case 'Firewall':
+                        return lowerLogType.includes('firewall') || 
+                               lowerLogType.includes('fw') ||
+                               lowerLogType.includes('pfsense') ||
+                               lowerLogType.includes('iptables');
+                    case 'IDS':
+                        return lowerLogType.includes('ids') || 
+                               lowerLogType.includes('intrusion') ||
+                               lowerLogType.includes('snort') ||
+                               lowerLogType.includes('suricata');
+                    case 'Authentication':
+                        return lowerLogType.includes('auth') || 
+                               lowerLogType.includes('login') ||
+                               lowerLogType.includes('unifiedauth') ||
+                               lowerLogType.includes('sso') ||
+                               lowerLogType.includes('ldap');
+                    case 'System':
+                        return lowerLogType.includes('system') || 
+                               lowerLogType.includes('sys') ||
+                               lowerLogType.includes('windows') ||
+                               lowerLogType.includes('defender') ||
+                               lowerLogType.includes('os') ||
+                               lowerLogType.includes('kernel');
+                    case 'App':
+                        return lowerLogType.includes('app') || 
+                               lowerLogType.includes('application') ||
+                               lowerLogType.includes('service') ||
+                               lowerLogType.includes('web');
+                    default:
+                        return logType === selectedType;
+                }
+            });
+        }
+
+        function filterLogs(type) {
+            // Update button states
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Filter logs
+            const filtered = filterLogsByType(testLogs, type);
+            
+            // Display results
+            const resultsDiv = document.getElementById('filteredResults');
+            resultsDiv.innerHTML = `
+                <h3>Filtered Results for "${type}" (${filtered.length} logs)</h3>
+                ${filtered.map(log => `
+                    <div class="log-item">
+                        Type: ${log.log_type} | Severity: ${log.severity} | IP: ${log.source_ip}
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        // Initialize with "All" filter
+        filterLogs('All');
+    </script>
+</body>
+</html>

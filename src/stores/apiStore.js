@@ -23,7 +23,7 @@ export const useAPIStore = defineStore('api', () => {
   const hiveCases = ref([])
   const loading = ref(false)
   const error = ref(null)
-  const timeRange = ref('24h')
+  const timeRange = ref('30d')
 
   // Fetch dashboard statistics
   const fetchDashboardStats = async () => {
@@ -72,7 +72,7 @@ export const useAPIStore = defineStore('api', () => {
   }
 
   // Fetch recent logs
-  const fetchRecentLogs = async (limit = 100) => {
+  const fetchRecentLogs = async (limit = 2000) => {
     loading.value = true
     error.value = null
     try {

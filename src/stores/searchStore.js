@@ -18,7 +18,7 @@ export const useSearchStore = defineStore('search', () => {
   const filters = ref({
     severity: '',
     logType: '',
-    timeRange: '24h',
+    timeRange: '7d', // Changed from '24h' to '7d' to include more logs
     action: '',
     sourceIP: '',
     destIP: '',
@@ -81,7 +81,7 @@ export const useSearchStore = defineStore('search', () => {
     filters.value = {
       severity: '',
       logType: '',
-      timeRange: '24h',
+      timeRange: '7d', // Changed from '24h' to '7d'
       action: '',
       sourceIP: '',
       destIP: '',
@@ -128,7 +128,7 @@ export const useSearchStore = defineStore('search', () => {
    */
   const hasActiveFilters = computed(() => {
     return searchQuery.value.length > 0 ||
-           Object.values(filters.value).some(v => v && v !== '24h')
+           Object.values(filters.value).some(v => v && v !== '7d') // Changed from '24h' to '7d'
   })
   
   /**
@@ -138,7 +138,7 @@ export const useSearchStore = defineStore('search', () => {
     let count = searchQuery.value.length > 0 ? 1 : 0
     Object.entries(filters.value).forEach(([key, value]) => {
       if (key === 'timeRange') {
-        if (value && value !== '24h') count++
+        if (value && value !== '7d') count++ // Changed from '24h' to '7d'
       } else if (value) {
         count++
       }

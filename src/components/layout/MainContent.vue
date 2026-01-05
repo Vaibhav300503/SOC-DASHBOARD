@@ -1,13 +1,13 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+  <div class="min-h-screen bg-app-primary">
     <!-- Top Navigation Bar -->
     <nav
       v-if="authStore.isAuthenticated"
-      class="sticky top-0 z-30 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/50"
+      class="sticky top-0 z-30 bg-app-primary/80 backdrop-blur-xl border-b border-card-border-default"
     >
       <div class="px-6 py-4 flex justify-between items-center">
         <div class="flex items-center gap-4">
-          <h1 class="text-lg font-semibold text-slate-50">{{ pageTitle }}</h1>
+          <h1 class="text-lg font-semibold text-text-primary-headings">{{ pageTitle }}</h1>
         </div>
 
         <div class="flex items-center gap-4">
@@ -15,7 +15,7 @@
           <div class="relative notification-dropdown">
             <button
               @click="toggleNotifications"
-              class="p-2 rounded-lg hover:bg-slate-800/50 text-slate-400 hover:text-cyan-400 relative transition-colors"
+              class="p-2 rounded hover:bg-hover-overlay text-icon-default hover:text-icon-active relative transition-colors"
               title="Notifications"
             >
               <i class="fas fa-bell text-sm"></i>
@@ -53,11 +53,11 @@
         v-for="toast in toasts"
         :key="toast.id"
         :class="[
-          'px-4 py-3 rounded-lg shadow-lg border transition-all duration-300 transform',
-          toast.type === 'success' ? 'bg-green-500/20 border-green-500 text-green-300' :
-          toast.type === 'error' ? 'bg-red-500/20 border-red-500 text-red-300' :
-          toast.type === 'warning' ? 'bg-yellow-500/20 border-yellow-500 text-yellow-300' :
-          'bg-blue-500/20 border-blue-500 text-blue-300'
+          'px-4 py-3 rounded shadow-lg border transition-all duration-300 transform',
+          toast.type === 'success' ? 'bg-green-600/20 border-green-600 text-green-400' :
+          toast.type === 'error' ? 'bg-red-600/20 border-red-600 text-red-400' :
+          toast.type === 'warning' ? 'bg-yellow-600/20 border-yellow-600 text-yellow-400' :
+          'bg-card-primary border-card-border-default text-accent-primary'
         ]"
       >
         <div class="flex items-center gap-2">
@@ -116,11 +116,11 @@ const pageTitle = computed(() => {
     '/': 'Dashboard',
     '/geo-analytics': 'Geo Analytics',
     '/ip-analytics': 'IP Analytics',
-    '/log-types': 'Log Types',
+    '/log-types': 'Log Viewer',
     '/endpoints': 'Endpoints',
     '/severity': 'Severity',
     '/tailscale': 'Tailscale',
-    '/log-viewer': 'Log Viewer',
+    '/log-viewer': 'Raw Logs',
   }
   return titles[route.path] || 'Dashboard'
 })
@@ -157,9 +157,9 @@ onUnmounted(() => {
 
 <style scoped>
 .dropdown-cyber {
-  background-color: var(--bg-card);
-  border: 1px solid rgba(202, 210, 253, 0.16);
-  border-radius: 0.75rem;
-  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.55);
+  background-color: var(--bg-card-primary);
+  border: 1px solid var(--border-card-default);
+  border-radius: 6px;
+  box-shadow: var(--shadow-card);
 }
 </style>

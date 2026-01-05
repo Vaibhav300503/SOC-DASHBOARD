@@ -9,9 +9,24 @@ export const setupInterceptors = () => {
   axios.interceptors.request.use(
     (config) => {
       const authStore = useAuthStore()
-      if (authStore.token) {
+      
+      // Check if we're in demo mode
+      const demoMode = localStorage.getItem('demoMode') === 'true'
+      
+      if (demoMode && authStore.user) {
+        // For demo mode, create a simple token from user data
+        const demoToken = btoa(JSON.stringify({ 
+          userId: authStore.user._id, 
+          email: authStore.user.email,
+          role: authStore.user.role,
+          demo: true 
+        }))
+        config.headers.Authorization = `Bearer ${demoToken}`
+      } else if (authStore.token) {
+        // For real backend authentication
         config.headers.Authorization = `Bearer ${authStore.token}`
       }
+      
       return config
     },
     (error) => {
@@ -27,6 +42,18 @@ export const setupInterceptors = () => {
     async (error) => {
       const authStore = useAuthStore()
       const originalRequest = error.config
+      const demoMode = localStorage.getItem('demoMode') === 'true'
+
+      // If in demo mode and we get 401, just continue (backend might not be configured for demo)
+      if (demoMode && error.response?.status === 401) {
+        console.warn('Demo mode: Ignoring 401 error, backend might not support demo tokens')
+        // Return a mock successful response for demo mode
+        return Promise.resolve({
+          data: { success: true, data: [], message: 'Demo mode - no backend data' },
+          status: 200,
+          statusText: 'OK'
+        })
+      }
 
       // If token expired, try to refresh
       if (error.response?.status === 401 && error.response?.data?.code === 'TOKEN_EXPIRED') {
@@ -57,8 +84,8 @@ export const setupInterceptors = () => {
         }
       }
 
-      // If unauthorized and not a retry, logout
-      if (error.response?.status === 401 && !originalRequest._retry) {
+      // If unauthorized and not a retry, logout (but not in demo mode)
+      if (error.response?.status === 401 && !originalRequest._retry && !demoMode) {
         console.error('Unauthorized access, logging out')
         await authStore.logout()
         // Only redirect if not on login page

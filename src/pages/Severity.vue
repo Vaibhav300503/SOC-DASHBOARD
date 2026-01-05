@@ -515,7 +515,7 @@ const severityLogs = ref([])
 
 onMounted(async () => {
   await apiStore.fetchDashboardStats()
-  await apiStore.fetchRecentLogs(1000)
+  await apiStore.fetchRecentLogs()
   // Also fetch severity-specific logs for better accuracy
   await fetchSeverityLogs(selectedSeverity.value)
 })

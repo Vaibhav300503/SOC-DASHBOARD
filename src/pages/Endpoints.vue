@@ -251,7 +251,7 @@ const searchResults = ref([])
 
 onMounted(async () => {
   await Promise.all([
-    apiStore.fetchRecentLogs(1000),
+    apiStore.fetchRecentLogs(),
     apiStore.fetchAgents(),
     apiStore.fetchDashboardStats() // Ensure we have topSourceIPs data
   ])
@@ -262,7 +262,7 @@ const refreshData = async () => {
   console.log('Refreshing data...')
   try {
     await Promise.all([
-      apiStore.fetchRecentLogs(1000),
+      apiStore.fetchRecentLogs(),
       apiStore.fetchDashboardStats()
     ])
     console.log('Data refreshed successfully')

@@ -1,0 +1,271 @@
+{
+  "timestamp": "2026-01-04T17:27:47.878Z",
+  "totalLogs": 74901,
+  "logSourceAnalysis": {
+    "field": "metadata.log_source",
+    "uniqueValues": 22,
+    "distribution": [
+      {
+        "_id": "/var/log/syslog",
+        "count": 42702
+      },
+      {
+        "_id": "network_snapshot",
+        "count": 22914
+      },
+      {
+        "_id": "windows_Security",
+        "count": 5357
+      },
+      {
+        "_id": "kernel",
+        "count": 1562
+      },
+      {
+        "_id": "NetworkMonitor",
+        "count": 1122
+      },
+      {
+        "_id": "nginx-access",
+        "count": 234
+      },
+      {
+        "_id": "Security",
+        "count": 212
+      },
+      {
+        "_id": "windows_authentication",
+        "count": 209
+      },
+      {
+        "_id": "windows_System",
+        "count": 138
+      },
+      {
+        "_id": "windows_Application",
+        "count": 95
+      },
+      {
+        "_id": "windows_Microsoft-Windows-Windows Firewall With Advanced Security/Firewall",
+        "count": 95
+      },
+      {
+        "_id": "windows_Microsoft-Windows-Windows Defender/Operational",
+        "count": 95
+      },
+      {
+        "_id": "tailscale",
+        "count": 83
+      },
+      {
+        "_id": "authentication",
+        "count": 33
+      },
+      {
+        "_id": "web-api",
+        "count": 14
+      },
+      {
+        "_id": "apache-access",
+        "count": 10
+      },
+      {
+        "_id": "linux-audit",
+        "count": 6
+      },
+      {
+        "_id": "FIM",
+        "count": 5
+      },
+      {
+        "_id": "sudoers",
+        "count": 5
+      },
+      {
+        "_id": "UnifiedAuth",
+        "count": 4
+      },
+      {
+        "_id": "test-script",
+        "count": 4
+      },
+      {
+        "_id": "windows_defender",
+        "count": 2
+      }
+    ]
+  },
+  "logTypeAnalysis": {
+    "field": "log_type",
+    "uniqueValues": 1,
+    "distribution": [
+      {
+        "_id": null,
+        "count": 74901
+      }
+    ]
+  },
+  "rawDataLogSourceAnalysis": {
+    "field": "raw_data.log_source",
+    "uniqueValues": 22,
+    "distribution": [
+      {
+        "_id": "/var/log/syslog",
+        "count": 42702
+      },
+      {
+        "_id": "network_snapshot",
+        "count": 22914
+      },
+      {
+        "_id": "windows_Security",
+        "count": 5357
+      },
+      {
+        "_id": "kernel",
+        "count": 1562
+      },
+      {
+        "_id": "NetworkMonitor",
+        "count": 1122
+      },
+      {
+        "_id": "nginx-access",
+        "count": 234
+      },
+      {
+        "_id": "Security",
+        "count": 212
+      },
+      {
+        "_id": "windows_authentication",
+        "count": 209
+      },
+      {
+        "_id": "windows_System",
+        "count": 138
+      },
+      {
+        "_id": "windows_Application",
+        "count": 95
+      },
+      {
+        "_id": "windows_Microsoft-Windows-Windows Firewall With Advanced Security/Firewall",
+        "count": 95
+      },
+      {
+        "_id": "windows_Microsoft-Windows-Windows Defender/Operational",
+        "count": 95
+      },
+      {
+        "_id": "tailscale",
+        "count": 83
+      },
+      {
+        "_id": "authentication",
+        "count": 33
+      },
+      {
+        "_id": "web-api",
+        "count": 14
+      },
+      {
+        "_id": "apache-access",
+        "count": 10
+      },
+      {
+        "_id": "linux-audit",
+        "count": 6
+      },
+      {
+        "_id": "FIM",
+        "count": 5
+      },
+      {
+        "_id": "sudoers",
+        "count": 5
+      },
+      {
+        "_id": "UnifiedAuth",
+        "count": 4
+      },
+      {
+        "_id": "test-script",
+        "count": 4
+      },
+      {
+        "_id": "windows_defender",
+        "count": 2
+      }
+    ]
+  },
+  "fieldPresence": {
+    "hasMetadataLogSource": 10,
+    "hasLogType": 0,
+    "hasRawDataLogSource": 10,
+    "hasRawDataType": 0,
+    "totalSampled": 10
+  },
+  "sampleDocuments": [
+    {
+      "_id": "694c2d6bc58388a839755b8d",
+      "metadata_log_source": "network_snapshot",
+      "raw_data_log_source": "network_snapshot",
+      "timestamp": "2025-12-24T23:44:01.614Z"
+    },
+    {
+      "_id": "694c2d6bc58388a839755b8e",
+      "metadata_log_source": "network_snapshot",
+      "raw_data_log_source": "network_snapshot",
+      "timestamp": "2025-12-24T23:44:01.639Z"
+    },
+    {
+      "_id": "694c2d6bc58388a839755b8f",
+      "metadata_log_source": "network_snapshot",
+      "raw_data_log_source": "network_snapshot",
+      "timestamp": "2025-12-24T23:44:01.648Z"
+    },
+    {
+      "_id": "694c2d6bc58388a839755b90",
+      "metadata_log_source": "network_snapshot",
+      "raw_data_log_source": "network_snapshot",
+      "timestamp": "2025-12-24T23:44:01.655Z"
+    },
+    {
+      "_id": "694c2d6bc58388a839755b91",
+      "metadata_log_source": "network_snapshot",
+      "raw_data_log_source": "network_snapshot",
+      "timestamp": "2025-12-24T23:44:01.661Z"
+    },
+    {
+      "_id": "694c2d6bc58388a839755b92",
+      "metadata_log_source": "network_snapshot",
+      "raw_data_log_source": "network_snapshot",
+      "timestamp": "2025-12-24T23:44:01.666Z"
+    },
+    {
+      "_id": "694c2d6bc58388a839755b93",
+      "metadata_log_source": "network_snapshot",
+      "raw_data_log_source": "network_snapshot",
+      "timestamp": "2025-12-24T23:44:01.672Z"
+    },
+    {
+      "_id": "694c2d6bc58388a839755b94",
+      "metadata_log_source": "network_snapshot",
+      "raw_data_log_source": "network_snapshot",
+      "timestamp": "2025-12-24T23:44:01.678Z"
+    },
+    {
+      "_id": "694c2d6bc58388a839755b95",
+      "metadata_log_source": "network_snapshot",
+      "raw_data_log_source": "network_snapshot",
+      "timestamp": "2025-12-24T23:44:01.684Z"
+    },
+    {
+      "_id": "694c2d6bc58388a839755b96",
+      "metadata_log_source": "network_snapshot",
+      "raw_data_log_source": "network_snapshot",
+      "timestamp": "2025-12-24T23:44:01.689Z"
+    }
+  ]
+}

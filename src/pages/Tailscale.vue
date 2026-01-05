@@ -192,43 +192,9 @@
       </div>
     </div>
 
-    <!-- Tailscale Logs -->
-    <div class="card-glass p-6 rounded-xl">
-      <div class="flex items-center justify-between mb-6">
-        <h3 class="text-lg font-semibold text-slate-dark-50">Tailscale Events</h3>
-        <select v-model="eventFilter" class="input-cyber text-sm">
-          <option value="">All Events</option>
-          <option value="CONNECTED">Connections</option>
-          <option value="AUTH">Authentications</option>
-          <option value="ERROR">Errors</option>
-        </select>
-      </div>
-
-      <div class="space-y-3">
-        <div v-if="filteredEvents.length === 0" class="text-center py-8 text-slate-dark-500">
-          <i class="fas fa-inbox text-2xl mb-2 block opacity-50"></i>
-          <p class="text-sm">No events found</p>
-        </div>
-        <div v-for="(event, idx) in filteredEvents.slice(0, 5)" :key="idx" class="bg-slate-dark-900/50 rounded-lg p-4 border border-slate-dark-700/50">
-          <div class="flex items-start justify-between">
-            <div>
-              <p class="text-sm font-semibold text-slate-dark-50">{{ event.type }}</p>
-              <p class="text-xs text-slate-dark-400 mt-1">{{ event.message }}</p>
-            </div>
-            <span class="px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ml-2 bg-cyan-500/20 text-cyan-400">
-              Event
-            </span>
-          </div>
-          <div class="text-xs text-slate-dark-500 mt-2">
-            <i class="fas fa-clock mr-1"></i>{{ event.timestamp }}
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Real-time Stream -->
     <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-6 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group relative overflow-hidden">
-      <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+      <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
       <div class="relative z-10">
         <div class="flex items-center justify-between mb-6">
           <h3 class="text-lg font-bold text-slate-50">Real-time Events Stream</h3>
@@ -298,8 +264,6 @@ const isSyncing = ref(false)
 const streamUnsubscribers = ref([])
 const tailscaleConfigured = ref(false)
 const noDataMessage = ref('Loading data...')
-const eventFilter = ref('')
-
 // Network status computed values
 const networkHealth = computed(() => {
   if (!devices.value.length) return 0
@@ -348,29 +312,6 @@ const avgLatency = computed(() => {
   return Math.round(baseLatency)
 })
 
-const filteredEvents = computed(() => {
-  if (!eventFilter.value) {
-    return realtimeEvents.value
-  }
-  
-  return realtimeEvents.value.filter(event => {
-    const eventType = event.type.toUpperCase()
-    const filterType = eventFilter.value.toUpperCase()
-    
-    if (filterType === 'CONNECTED') {
-      return eventType.includes('CONNECTED') || eventType.includes('CONNECTION')
-    }
-    if (filterType === 'AUTH') {
-      return eventType.includes('AUTH')
-    }
-    if (filterType === 'ERROR') {
-      return eventType.includes('ERROR') || eventType.includes('FAILED')
-    }
-    
-    return true
-  })
-})
-
 // Connect to SSE stream for real-time Tailscale logs
 const connectStream = () => {
   try {
@@ -399,9 +340,15 @@ const disconnectStream = () => {
 const addRealtimeEvent = (log) => {
   if (!tailscaleConfigured.value) return
   
+  // Filter out Tailscale connection events
+  const eventType = (log.type || log.event_type || 'EVENT').toUpperCase()
+  if (eventType.includes('CONNECTED') || eventType.includes('CONNECTION') || eventType.includes('PEER_CONNECTED')) {
+    return // Skip connection events
+  }
+  
   const event = {
     timestamp: new Date(log.ts || log.timestamp).toLocaleTimeString(),
-    type: (log.type || log.event_type || 'EVENT').toUpperCase(),
+    type: eventType,
     message: log.message || log.event || `${log.type} from ${log.user || 'unknown'}`
   }
   

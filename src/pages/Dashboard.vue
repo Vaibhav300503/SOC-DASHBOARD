@@ -38,7 +38,7 @@
         <div class="text-3xl font-bold text-slate-50">{{ apiStore.total.toLocaleString() }}</div>
         <div class="text-xs font-medium text-emerald-400 mt-2 flex items-center gap-1">
           <i class="fas fa-arrow-up text-[10px]"></i>
-          12% vs last hour
+          {{ calculateLogGrowth() }}
         </div>
       </div>
 
@@ -298,6 +298,30 @@ const getTopDestinationIPs = () => {
   }))
 }
 
+const calculateLogGrowth = () => {
+  // Calculate growth based on recent logs vs older logs
+  const recentLogs = apiStore.logs || []
+  if (recentLogs.length === 0) return 'No data'
+  
+  const now = new Date()
+  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
+  
+  const recentCount = recentLogs.filter(log => {
+    const logTime = new Date(log.timestamp)
+    return logTime >= oneHourAgo
+  }).length
+  
+  const olderCount = recentLogs.filter(log => {
+    const logTime = new Date(log.timestamp)
+    return logTime < oneHourAgo
+  }).length
+  
+  if (olderCount === 0) return 'New data'
+  
+  const growthPercent = Math.round(((recentCount - olderCount) / olderCount) * 100)
+  return `${growthPercent >= 0 ? '+' : ''}${growthPercent}% vs last hour`
+}
+
 onMounted(async () => {
   // Auto-refresh only once per browser session
   const autoRefreshed = sessionStorage.getItem('dashboardAutoRefreshed')
@@ -318,6 +342,7 @@ const handleRefresh = async () => {
     isRefreshing.value = true
     await Promise.all([
       apiStore.fetchDashboardStats(),
+      apiStore.fetchRecentLogs(), // Add logs for growth calculation
       apiStore.fetchTailscaleStats(),
       apiStore.fetchRecentEvents(),
       apiStore.fetchAlertMetrics(),

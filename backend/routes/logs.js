@@ -3,8 +3,11 @@ import Log from '../models/Log.js'
 import Event from '../models/Event.js'
 import { validateLog, validateLogArray } from '../middleware/validation.js'
 import { enrichGeoData, enrichGeoDataBatch } from '../middleware/geoip.js'
+import logClassificationMiddleware from '../middleware/logClassification.js'
+import LogTypeClassifier from '../utils/logTypeClassifier.js'
 
 const router = express.Router()
+const classifier = new LogTypeClassifier()
 
 // Helper function to normalize severity values
 const normalizeSeverity = (severity) => {
@@ -32,9 +35,9 @@ const normalizeLogData = (log) => {
 
 /**
  * POST /api/logs/ingest
- * Accept JSON logs from various sources
+ * Accept JSON logs from various sources with automatic classification
  */
-router.post('/ingest', async (req, res) => {
+router.post('/ingest', logClassificationMiddleware.classifyLogs, async (req, res) => {
   try {
     let logs = Array.isArray(req.body) ? req.body : [req.body]
 
@@ -44,7 +47,7 @@ router.post('/ingest', async (req, res) => {
       return res.status(400).json({ error: 'Invalid log array format' })
     }
 
-    // Normalize and enrich logs
+    // Normalize and enrich logs (classification already applied by middleware)
     const normalizedLogs = logs.map(log => {
       const { error, value } = validateLog(log)
       if (error) {
@@ -72,7 +75,8 @@ router.post('/ingest', async (req, res) => {
     res.json({
       success: true,
       inserted: result.length,
-      ids: result.map(r => r._id)
+      ids: result.map(r => r._id),
+      classification_stats: logClassificationMiddleware.getClassificationStats(normalizedLogs)
     })
   } catch (error) {
     console.error('Log ingest error:', error)
@@ -82,11 +86,11 @@ router.post('/ingest', async (req, res) => {
 
 /**
  * GET /api/logs
- * Get all logs with optional filtering
+ * Get all logs with optional filtering - Updated to use standardized log types
  */
 router.get('/', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 100, 1000)
+    const limit = parseInt(req.query.limit) || 100
     const severity = req.query.severity
     const logType = req.query.logType
     const timeRange = req.query.timeRange || '24h'
@@ -94,44 +98,135 @@ router.get('/', async (req, res) => {
     const page = parseInt(req.query.page) || 1
     const skip = (page - 1) * limit
 
-    // Build query
-    let query = {}
+    // Build aggregation pipeline
+    const pipeline = []
 
-    // Time range filter
-    const hoursMap = {
-      '1h': 1,
-      '6h': 6,
-      '24h': 24,
-      '7d': 168,
-      '30d': 720
+    // Time range filter (if specified)
+    if (timeRange !== 'all') {
+      const hoursMap = {
+        '1h': 1,
+        '6h': 6,
+        '24h': 24,
+        '7d': 168,
+        '30d': 720
+      }
+      const hoursAgo = hoursMap[timeRange] || 24
+      const since = new Date(Date.now() - hoursAgo * 60 * 60 * 1000)
+
+      pipeline.push({
+        $match: {
+          $or: [
+            { timestamp: { $gte: since } },
+            { ingested_at: { $gte: since } },
+            { created_at: { $gte: since } },
+            { createdAt: { $gte: since } }
+          ]
+        }
+      })
     }
-    const hoursAgo = hoursMap[timeRange] || 24
-    const since = new Date(Date.now() - hoursAgo * 60 * 60 * 1000)
 
-    query.$or = [
-      { timestamp: { $gte: since } },
-      { ingested_at: { $gte: since } },
-      { created_at: { $gte: since } },
-      { createdAt: { $gte: since } }
-    ]
+    // Add field mapping with standardized log types
+    pipeline.push({
+      $addFields: {
+        id: '$_id',
+        // Use standardized log_type if available, otherwise classify on-the-fly
+        log_type: {
+          $cond: {
+            if: { $ne: ['$log_type', null] },
+            then: '$log_type',
+            else: {
+              $switch: {
+                branches: [
+                  // Authentication
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /unified.*auth|windows.*auth|authentication/i } }, then: 'auth' },
+                  // Network
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /network.*snapshot|network.*monitor|tailscale/i } }, then: 'network' },
+                  // Firewall
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /firewall/i } }, then: 'firewall' },
+                  // Application
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /application|nginx|apache|web.*api/i } }, then: 'application' },
+                  // Database
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /database|sql|mysql|postgres|mongodb/i } }, then: 'database' },
+                  // Registry
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /registry|reg|hkey/i } }, then: 'registry' },
+                  // FIM
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /fim|file.*integrity/i } }, then: 'fim' }
+                ],
+                default: 'system'
+              }
+            }
+          }
+        },
+        original_log_type: { $ifNull: ['$original_log_type', '$metadata.log_source', 'unknown'] },
+        endpoint: { $ifNull: ['$metadata.endpoint_name', '$metadata.hostname', 'Unknown'] },
+        source_ip: { $ifNull: ['$ip_address', '$raw_data.src_ip', 'Unknown'] },
+        dest_ip: { $ifNull: ['$raw_data.dst_ip', 'Unknown'] },
+        // Assign severity based on log source since all DB severities are null
+        severity: {
+          $switch: {
+            branches: [
+              { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /security|intrusion|malware|Security/i } }, then: 'High' },
+              { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /error|fail|critical|kernel/i } }, then: 'Medium' }
+            ],
+            default: 'Low'
+          }
+        },
+        protocol: { $ifNull: ['$raw_data.protocol', 'N/A'] },
+        port: { $ifNull: ['$raw_data.src_port', 'N/A'] },
+        action: { $ifNull: ['$raw_data.status', '$parsed_data.event_action', 'N/A'] }
+      }
+    })
 
-    if (severity) query.severity = severity
-    if (logType) query.log_type = logType
-    if (action) query['raw.action'] = action
+    // Apply filters after field mapping
+    const matchConditions = {}
+    if (severity) matchConditions.severity = severity
+    if (logType) matchConditions.log_type = logType
+    if (action) matchConditions.action = action
 
-    // Get total count for pagination
-    const total = await Log.countDocuments(query)
+    if (Object.keys(matchConditions).length > 0) {
+      pipeline.push({ $match: matchConditions })
+    }
 
-    // Get logs with pagination
-    const logs = await Log.find(query)
-      .sort({ timestamp: -1 })
-      .skip(skip)
-      .limit(limit)
+    // Get total count for pagination (before skip/limit)
+    const countPipeline = [...pipeline, { $count: "total" }]
+    const countResult = await Log.aggregate(countPipeline)
+    const total = countResult.length > 0 ? countResult[0].total : 0
 
-    const normalizedLogs = logs.map(normalizeLogData);
+    // Add pagination
+    pipeline.push(
+      { $sort: { timestamp: -1 } },
+      { $skip: skip },
+      { $limit: limit }
+    )
+
+    // Project final fields
+    pipeline.push({
+      $project: {
+        _id: 1,
+        id: 1,
+        timestamp: 1,
+        severity: 1,
+        source_ip: 1,
+        dest_ip: 1,
+        log_type: 1,
+        original_log_type: 1,
+        endpoint: 1,
+        raw: '$raw_data',
+        raw_data: 1,
+        metadata: 1,
+        geo: 1,
+        protocol: 1,
+        port: 1,
+        action: 1,
+        classification_version: 1,
+        classified_at: 1
+      }
+    })
+
+    const logs = await Log.aggregate(pipeline)
 
     res.json({
-      data: normalizedLogs,
+      data: logs,
       total,
       page,
       pages: Math.ceil(total / limit),
@@ -145,88 +240,123 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/logs/recent
- * Get recent logs
+ * Get recent logs - Updated to use standardized log types
  */
 router.get('/recent', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 100, 1000)
+    const limit = parseInt(req.query.limit) || 100
     const severity = req.query.severity
     const logType = req.query.logType
 
-    // Use aggregation for proper normalization
-    const pipeline = [
-      {
-        $addFields: {
-          normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          rawSeverity: { 
-            $toString: { 
-              $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Low'] 
-            } 
-          },
-          normSourceIP: { $ifNull: ['$source_ip', '$ip_address', '$metadata.ip_address', '$raw_data.src_ip', '$raw.source_ip', 'Unknown'] },
-          normDestIP: { $ifNull: ['$dest_ip', '$raw_data.dst_ip', '$raw.dest_ip', 'Unknown'] },
-          normLogType: { $ifNull: ['$log_type', '$metadata.log_source', '$raw_data.log_source', '$raw.log_type', 'System'] },
-          normEndpoint: { $ifNull: ['$endpoint', '$metadata.endpoint_name', '$raw_data.endpoint_name', '$raw.endpoint', 'Unknown'] }
-        }
-      },
-      {
-        $addFields: {
-          lowerSeverity: { $toLower: '$rawSeverity' }
-        }
-      },
-      {
-        $addFields: {
-          normSeverity: {
-            $switch: {
-              branches: [
-                { case: { $regexMatch: { input: '$lowerSeverity', regex: /critical/i } }, then: 'Critical' },
-                { case: { $regexMatch: { input: '$lowerSeverity', regex: /high/i } }, then: 'High' },
-                { case: { $regexMatch: { input: '$lowerSeverity', regex: /medium/i } }, then: 'Medium' },
-                { case: { $regexMatch: { input: '$lowerSeverity', regex: /low/i } }, then: 'Low' }
-              ],
-              default: 'Low'
+    // Build aggregation pipeline
+    const pipeline = []
+    
+    // Add fields mapping first with standardized log types
+    pipeline.push({
+      $addFields: {
+        id: '$_id',
+        // Use standardized log_type if available, otherwise classify on-the-fly
+        log_type: {
+          $cond: {
+            if: { $ne: ['$log_type', null] },
+            then: '$log_type',
+            else: {
+              $switch: {
+                branches: [
+                  // Authentication
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /unified.*auth|windows.*auth|authentication/i } }, then: 'auth' },
+                  // Network
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /network.*snapshot|network.*monitor|tailscale/i } }, then: 'network' },
+                  // Firewall
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /firewall/i } }, then: 'firewall' },
+                  // Application
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /application|nginx|apache|web.*api/i } }, then: 'application' },
+                  // Database
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /database|sql|mysql|postgres|mongodb/i } }, then: 'database' },
+                  // Registry
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /registry|reg|hkey/i } }, then: 'registry' },
+                  // FIM
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /fim|file.*integrity/i } }, then: 'fim' }
+                ],
+                default: 'system'
+              }
             }
           }
-        }
+        },
+        original_log_type: { $ifNull: ['$original_log_type', '$metadata.log_source', 'unknown'] },
+        endpoint: { $ifNull: ['$metadata.endpoint_name', '$metadata.hostname', 'Unknown'] },
+        source_ip: { $ifNull: ['$ip_address', '$raw_data.src_ip', 'Unknown'] },
+        dest_ip: { $ifNull: ['$raw_data.dst_ip', 'Unknown'] },
+        // Assign severity based on log source since all DB severities are null
+        severity: {
+          $switch: {
+            branches: [
+              { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /security|intrusion|malware|Security/i } }, then: 'High' },
+              { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /error|fail|critical|kernel/i } }, then: 'Medium' }
+            ],
+            default: 'Low'
+          }
+        },
+        protocol: { $ifNull: ['$raw_data.protocol', 'N/A'] },
+        port: { $ifNull: ['$raw_data.src_port', 'N/A'] },
+        action: { $ifNull: ['$raw_data.status', '$parsed_data.event_action', 'N/A'] }
       }
-    ]
+    })
 
-    // Add filters if provided
+    // Add filters after field mapping
     const matchConditions = {}
-    if (severity) matchConditions.normSeverity = severity
-    if (logType) matchConditions.normLogType = logType
     
+    if (severity) {
+      matchConditions.severity = severity
+    }
+    
+    if (logType) {
+      matchConditions.log_type = logType
+    }
+
     if (Object.keys(matchConditions).length > 0) {
       pipeline.push({ $match: matchConditions })
     }
 
+    // Sort and limit
     pipeline.push(
-      { $sort: { normTimestamp: -1 } },
-      { $limit: limit },
-      {
-        $project: {
-          _id: 1,
-          id: '$_id',
-          timestamp: '$normTimestamp',
-          severity: '$normSeverity',
-          source_ip: '$normSourceIP',
-          dest_ip: '$normDestIP',
-          log_type: '$normLogType',
-          endpoint: '$normEndpoint',
-          raw: 1,
-          raw_data: 1,
-          metadata: 1,
-          geo: 1,
-          protocol: { $ifNull: ['$raw.protocol', '$raw_data.protocol', '$protocol', 'N/A'] },
-          port: { $ifNull: ['$raw.port', '$raw_data.port', '$port', 'N/A'] },
-          action: { $ifNull: ['$raw.action', '$raw_data.action', '$action', 'N/A'] }
-        }
-      }
+      { $sort: { timestamp: -1 } },
+      { $limit: limit }
     )
+
+    // Project final fields
+    pipeline.push({
+      $project: {
+        _id: 1,
+        id: 1,
+        timestamp: 1,
+        severity: 1,
+        source_ip: 1,
+        dest_ip: 1,
+        log_type: 1,
+        original_log_type: 1,
+        endpoint: 1,
+        raw: '$raw_data',
+        raw_data: 1,
+        metadata: 1,
+        geo: 1,
+        protocol: 1,
+        port: 1,
+        action: 1,
+        classification_version: 1,
+        classified_at: 1
+      }
+    })
 
     const logs = await Log.aggregate(pipeline)
 
-    res.json({ data: logs, total: logs.length })
+    // Get total count for the same filters (without limit)
+    const countPipeline = pipeline.slice(0, -2) // Remove sort and limit
+    countPipeline.push({ $count: "total" })
+    const countResult = await Log.aggregate(countPipeline)
+    const total = countResult.length > 0 ? countResult[0].total : 0
+
+    res.json({ data: logs, total })
   } catch (error) {
     console.error('Error fetching recent logs:', error)
     res.status(500).json({ error: error.message })

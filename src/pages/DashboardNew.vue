@@ -22,7 +22,7 @@
         class="px-6 py-2.5 rounded-lg bg-gradient-to-r from-slate-800 to-slate-900 border border-slate-700/50 text-slate-300 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 text-sm font-medium group relative overflow-hidden"
         :disabled="isRefreshing"
       >
-        <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
         <i :class="isRefreshing ? 'fas fa-spinner fa-spin' : 'fas fa-redo'" class="mr-2 text-xs"></i>
         <span class="relative">{{ isRefreshing ? 'Refreshing...' : 'Refresh' }}</span>
       </button>
@@ -43,10 +43,10 @@
       <div class="animate-slide-in-up" style="animation-delay: 300ms">
         <StatCard
           label="Total Events"
-          :value="apiStore.total"
+          :value="apiStore.total || 0"
           icon="fas fa-file-alt"
           severity="normal"
-          :change="12"
+          :change="calculateLogGrowth()"
         />
       </div>
       <div class="animate-slide-in-up" style="animation-delay: 400ms">
@@ -68,7 +68,7 @@
       <div class="animate-slide-in-up" style="animation-delay: 600ms">
         <StatCard
           label="Active Hosts"
-          :value="apiStore.uniqueHosts"
+          :value="apiStore.uniqueHosts || 0"
           icon="fas fa-server"
           severity="low"
         />
@@ -82,7 +82,7 @@
       <div class="animate-slide-in-up" style="animation-delay: 700ms">
         <StatCard
           label="Total Alerts"
-          :value="apiStore.totalAlerts"
+          :value="apiStore.totalAlerts || 0"
           icon="fas fa-bell"
           severity="info"
         />
@@ -90,7 +90,7 @@
       <div class="animate-slide-in-up" style="animation-delay: 800ms">
         <StatCard
           label="Critical Alerts"
-          :value="apiStore.criticalAlerts"
+          :value="apiStore.criticalAlerts || 0"
           icon="fas fa-radiation-alt"
           severity="critical"
         />
@@ -98,7 +98,7 @@
       <div class="animate-slide-in-up" style="animation-delay: 900ms">
         <StatCard
           label="Analyzed Alerts"
-          :value="apiStore.analyzedAlerts"
+          :value="apiStore.analyzedAlerts || 0"
           icon="fas fa-microscope"
           severity="normal"
         />
@@ -135,7 +135,7 @@
             class="bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-lg p-4 border border-slate-700/40 text-center hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group relative overflow-hidden animate-slide-in-up"
             :style="{ 'animation-delay': `${1200 + index * 50}ms` }"
           >
-            <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             <div class="relative">
               <div class="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">{{ item.value }}</div>
               <div class="text-xs text-slate-400 mt-2 font-medium">{{ item.name }}</div>
@@ -181,38 +181,64 @@
       <div class="animate-slide-in-up" style="animation-delay: 1800ms">
         <!-- Recent Cases -->
         <DashboardCard title="Recent Cases" size="large">
-          <div v-if="apiStore.hiveCases.length === 0" class="text-center py-12 opacity-50">
-            <i class="fas fa-folder-open text-4xl mb-3 block text-slate-600"></i>
-            <p class="text-sm text-slate-500">No recent cases found</p>
+          <!-- Loading State -->
+          <div v-if="casesLoading" class="text-center py-12">
+            <i class="fas fa-spinner fa-spin text-3xl mb-3 block text-cyan-400"></i>
+            <p class="text-sm text-slate-400">Loading cases...</p>
           </div>
 
+          <!-- Error State -->
+          <div v-else-if="casesError" class="text-center py-12 text-red-400">
+            <i class="fas fa-exclamation-triangle text-4xl mb-3 block text-red-500"></i>
+            <p class="text-sm font-medium mb-2">Failed to load cases</p>
+            <p class="text-xs text-slate-500 mb-4">{{ casesError }}</p>
+            <button 
+              @click="retryCases" 
+              class="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-sm border border-red-500/30 transition-all duration-300"
+            >
+              <i class="fas fa-redo mr-2"></i>
+              Retry
+            </button>
+          </div>
+
+          <!-- Empty State -->
+          <div v-else-if="displayedCases.length === 0" class="text-center py-12 opacity-50">
+            <i class="fas fa-folder-open text-4xl mb-3 block text-slate-600"></i>
+            <p class="text-sm text-slate-500 font-medium mb-2">No cases available</p>
+            <p class="text-xs text-slate-600">Cases from TheHive or MongoDB will appear here</p>
+          </div>
+
+          <!-- Cases List -->
           <div v-else class="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
             <div
-              v-for="(hCase, index) in apiStore.hiveCases"
+              v-for="(hCase, index) in displayedCases"
               :key="hCase.id || hCase._id"
               class="p-4 bg-gradient-to-r from-slate-800/30 to-slate-900/30 rounded-lg border border-slate-700/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group relative overflow-hidden animate-slide-in-up"
               :style="{ 'animation-delay': `${1900 + index * 50}ms` }"
             >
-              <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div class="relative">
                 <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
+                  <div class="min-w-0 flex-1">
                     <div class="text-sm font-semibold text-slate-100 truncate group-hover:text-cyan-400 transition-colors">
                       {{ hCase.title }}
                     </div>
                     <div class="text-xs text-slate-400 mt-1 line-clamp-2">
-                      {{ hCase.description }}
+                      {{ hCase.description || 'No description available' }}
                     </div>
                   </div>
-                  <div
-                    :class="[
-                      'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-300',
-                      hCase.severity === 4 ? 'bg-red-500/20 text-red-400 border border-red-500/50 group-hover:shadow-lg group-hover:shadow-red-500/30' :
-                      hCase.severity === 3 ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50 group-hover:shadow-lg group-hover:shadow-orange-500/30' :
-                      'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 group-hover:shadow-lg group-hover:shadow-cyan-500/30'
-                    ]"
-                  >
-                    {{ hCase.severity === 4 ? 'CRITICAL' : hCase.severity === 3 ? 'HIGH' : 'MED' }}
+                  <div class="flex flex-col items-end gap-2">
+                    <div
+                      :class="[
+                        'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-300',
+                        getSeverityClass(hCase.severity)
+                      ]"
+                    >
+                      {{ getSeverityLabel(hCase.severity) }}
+                    </div>
+                    <div class="px-2 py-0.5 bg-slate-600/30 rounded text-[10px] font-medium text-slate-400">
+                      {{ hCase.source || 'Unknown' }}
+                    </div>
                   </div>
                 </div>
 
@@ -223,12 +249,29 @@
                       {{ hCase.owner || 'Unassigned' }}
                     </span>
                     <span class="w-1 h-1 bg-slate-600 rounded-full"></span>
-                    <span>{{ formatTime(hCase.createdAt || hCase._createdAt) }}</span>
+                    <span>{{ formatTime(hCase.createdAt || hCase._createdAt || hCase.created_at) }}</span>
                   </div>
                   <div class="px-2 py-0.5 bg-slate-700/50 rounded text-slate-400 text-[10px] font-medium">
                     {{ hCase.status || 'Open' }}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cases Summary -->
+          <div v-if="displayedCases.length > 0" class="mt-4 pt-4 border-t border-slate-700/40">
+            <div class="flex items-center justify-between text-xs text-slate-500">
+              <span>{{ displayedCases.length }} cases shown</span>
+              <div class="flex items-center gap-3">
+                <span class="flex items-center gap-1">
+                  <div class="w-2 h-2 bg-red-500 rounded-full"></div>
+                  {{ getCaseSeverityCount(4) + getCaseSeverityCount(3) }} High Priority
+                </span>
+                <span class="flex items-center gap-1">
+                  <div class="w-2 h-2 bg-cyan-500 rounded-full"></div>
+                  {{ getCaseSeverityCount(2) + getCaseSeverityCount(1) }} Normal
+                </span>
               </div>
             </div>
           </div>
@@ -240,10 +283,11 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAPIStore } from '../stores/apiStore'
 import { useToast } from '../composables/useToast'
+import { getDisplayName } from '../utils/logTypeConstants'
 
 // Components
 import DashboardCard from '../components/common/DashboardCard.vue'
@@ -263,38 +307,131 @@ const isRefreshing = ref(false)
 const isExporting = ref(false)
 const lastRefreshAt = ref(0)
 
+// Cases state management
+const casesLoading = ref(false)
+const casesError = ref(null)
+const displayedCases = computed(() => apiStore.hiveCases || [])
+
 const formatTime = (timestamp) => {
   if (!timestamp) return 'Unknown'
   return new Date(timestamp).toLocaleString()
 }
 
+const getSeverityClass = (severity) => {
+  // Handle both numeric and string severities
+  const numericSeverity = typeof severity === 'string' ? 
+    ({ 'Critical': 4, 'High': 3, 'Medium': 2, 'Low': 1 }[severity] || 1) : 
+    (severity || 1)
+
+  switch (numericSeverity) {
+    case 4:
+      return 'bg-red-500/20 text-red-400 border border-red-500/50 group-hover:shadow-lg group-hover:shadow-red-500/30'
+    case 3:
+      return 'bg-orange-500/20 text-orange-400 border border-orange-500/50 group-hover:shadow-lg group-hover:shadow-orange-500/30'
+    case 2:
+      return 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 group-hover:shadow-lg group-hover:shadow-yellow-500/30'
+    case 1:
+    default:
+      return 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 group-hover:shadow-lg group-hover:shadow-cyan-500/30'
+  }
+}
+
+const getSeverityLabel = (severity) => {
+  // Handle both numeric and string severities
+  if (typeof severity === 'string') return severity.toUpperCase()
+  
+  const numericSeverity = severity || 1
+  switch (numericSeverity) {
+    case 4: return 'CRITICAL'
+    case 3: return 'HIGH'
+    case 2: return 'MEDIUM'
+    case 1: return 'LOW'
+    default: return 'LOW'
+  }
+}
+
+const getCaseSeverityCount = (severity) => {
+  return displayedCases.value.filter(c => {
+    const caseSeverity = typeof c.severity === 'string' ? 
+      ({ 'Critical': 4, 'High': 3, 'Medium': 2, 'Low': 1 }[c.severity] || 1) : 
+      (c.severity || 1)
+    return caseSeverity === severity
+  }).length
+}
+
+const retryCases = async () => {
+  casesError.value = null
+  await fetchCasesWithErrorHandling()
+}
+
+const fetchCasesWithErrorHandling = async () => {
+  casesLoading.value = true
+  casesError.value = null
+  
+  try {
+    await apiStore.fetchRecentCases(10)
+    if (displayedCases.value.length === 0) {
+      console.log('No cases returned from API')
+    }
+  } catch (error) {
+    console.error('Failed to fetch cases:', error)
+    casesError.value = error.message || 'Failed to load cases'
+  } finally {
+    casesLoading.value = false
+  }
+}
+
 const getCriticalCount = () => {
-  return apiStore.severityBreakdown.find(s => s._id === 'Critical')?.count || 0
+  return apiStore.severityBreakdown?.find(s => s._id === 'Critical')?.count || 0
 }
 
 const getHighCount = () => {
-  return apiStore.severityBreakdown.find(s => s._id === 'High')?.count || 0
+  return apiStore.severityBreakdown?.find(s => s._id === 'High')?.count || 0
 }
 
 const getLogTypeDistribution = () => {
-  return apiStore.logTypeBreakdown.map(item => ({
-    name: item._id,
+  return (apiStore.logTypeBreakdown || []).map(item => ({
+    name: getDisplayName(item._id) || item._id,
     value: item.count
   }))
 }
 
 const getTopSourceIPs = () => {
-  return apiStore.topSourceIPs.map(item => ({
+  return (apiStore.topSourceIPs || []).map(item => ({
     ip: item._id,
     count: item.count
   }))
 }
 
 const getTopDestinationIPs = () => {
-  return apiStore.topDestinationIPs.map(item => ({
+  return (apiStore.topDestinationIPs || []).map(item => ({
     ip: item._id,
     count: item.count
   }))
+}
+
+const calculateLogGrowth = () => {
+  // Calculate growth based on recent logs vs older logs
+  const recentLogs = apiStore.logs || []
+  if (recentLogs.length === 0) return null // Return null to hide change indicator
+  
+  const now = new Date()
+  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
+  
+  const recentCount = recentLogs.filter(log => {
+    const logTime = new Date(log.timestamp)
+    return logTime >= oneHourAgo
+  }).length
+  
+  const olderCount = recentLogs.filter(log => {
+    const logTime = new Date(log.timestamp)
+    return logTime < oneHourAgo
+  }).length
+  
+  if (olderCount === 0) return null // Return null if no comparison data
+  
+  const growthPercent = Math.round(((recentCount - olderCount) / olderCount) * 100)
+  return growthPercent
 }
 
 onMounted(async () => {
@@ -302,6 +439,9 @@ onMounted(async () => {
   if (!autoRefreshed) {
     await handleRefresh()
     sessionStorage.setItem('dashboardAutoRefreshed', '1')
+  } else {
+    // Still fetch cases on subsequent visits
+    await fetchCasesWithErrorHandling()
   }
 })
 
@@ -315,11 +455,12 @@ const handleRefresh = async () => {
     isRefreshing.value = true
     await Promise.all([
       apiStore.fetchDashboardStats(),
+      apiStore.fetchRecentLogs(), // Add logs for growth calculation
       apiStore.fetchTailscaleStats(),
       apiStore.fetchRecentEvents(),
       apiStore.fetchAlertMetrics(),
       apiStore.fetchRecentAlerts(20),
-      apiStore.fetchRecentCases(10)
+      fetchCasesWithErrorHandling() // Use error handling wrapper
     ])
     addToast('Dashboard data refreshed successfully', 'success')
   } catch (error) {
@@ -337,13 +478,13 @@ const handleExport = async () => {
     const exportData = {
       timestamp: new Date().toISOString(),
       dashboardStats: {
-        totalEvents: apiStore.total,
+        totalEvents: apiStore.total || 0,
         criticalCount: getCriticalCount(),
         highCount: getHighCount(),
-        activeHosts: apiStore.uniqueHosts
+        activeHosts: apiStore.uniqueHosts || 0
       },
-      severityBreakdown: apiStore.severityBreakdown,
-      logTypeBreakdown: apiStore.logTypeBreakdown,
+      severityBreakdown: apiStore.severityBreakdown || [],
+      logTypeBreakdown: apiStore.logTypeBreakdown || [],
       topSourceIPs: getTopSourceIPs(),
       topDestinationIPs: getTopDestinationIPs(),
       recentEvents: apiStore.recentEvents?.slice(0, 100) || []

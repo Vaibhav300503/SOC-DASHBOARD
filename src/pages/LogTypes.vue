@@ -85,10 +85,10 @@
     </div>
 
     <!-- Statistics -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
       <div class="stat-card card-accent-cyan">
-        <div class="stat-value text-accent-primary">{{ apiStore.totalLogs }}</div>
-        <div class="stat-label">Total Logs</div>
+        <div class="stat-value text-accent-primary">{{ totalFilteredCount }}</div>
+        <div class="stat-label">{{ selectedLogType }} Logs</div>
       </div>
       <div class="stat-card card-accent-red">
         <div class="stat-value text-neon-red">{{ criticalCount }}</div>
@@ -114,13 +114,9 @@
         <div>
           <label class="block text-sm font-medium text-slate-dark-300 mb-2">Log Type</label>
           <select v-model="selectedLogType" class="input-cyber w-full">
-            <option value="All">All Types</option>
-            <option value="Firewall">Firewall</option>
-            <option value="IDS">IDS</option>
-            <option value="Authentication">Authentication</option>
-            <option value="App">App</option>
-            <option value="System">System</option>
-            <option value="Registry">Registry</option>
+            <option v-for="logType in logTypes" :key="logType" :value="logType">
+              {{ logType }}
+            </option>
           </select>
         </div>
         <div>
@@ -224,7 +220,7 @@
               <td v-if="selectedLogType !== 'Registry'" class="text-slate-dark-300">{{ log.endpoint }}</td>
               <td>
                 <span class="px-2 py-1 rounded text-xs font-semibold bg-slate-dark-700 text-slate-dark-300">
-                  {{ log.log_type || 'Unknown' }}
+                  {{ getDisplayName(log.log_type) || 'Unknown' }}
                 </span>
               </td>
               <td>
@@ -271,7 +267,7 @@
           @click="displayLimit += 20"
           class="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/50 text-cyan-400 hover:border-cyan-400 hover:shadow-lg hover:shadow-cyan-500/30 transition-all duration-300 text-sm font-medium group relative overflow-hidden"
         >
-          <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           <i class="fas fa-chevron-down mr-2"></i>
           <span class="relative">Load More</span>
         </button>
@@ -286,10 +282,10 @@
     >
       <div class="bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/30 rounded-2xl max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl backdrop-blur-xl group relative">
         <!-- Animated gradient background on hover -->
-        <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/5 to-cyan-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl pointer-events-none"></div>
+        <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/5 to-slate-600/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl pointer-events-none"></div>
 
         <!-- Top accent line -->
-        <div class="h-0.5 bg-gradient-to-r from-cyan-500/0 via-cyan-500/50 to-cyan-500/0 group-hover:via-cyan-500/100 transition-all duration-300 rounded-t-2xl"></div>
+        <div class="h-0.5 bg-gradient-to-r from-cyan-500/0 via-cyan-500/50 to-cyan-500/0 group-hover:via-cyan-500/50 transition-all duration-300 rounded-t-2xl"></div>
 
         <!-- Modal Header - Sticky -->
         <div class="sticky top-0 bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-xl border-b border-slate-700/50 p-6 z-20 shadow-lg">
@@ -312,7 +308,7 @@
           <!-- Quick Info Cards -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-4 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group/card relative overflow-hidden">
-              <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
+              <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
               <div class="relative z-10">
                 <div class="text-xs text-slate-400 uppercase tracking-wide mb-2 font-medium">Severity</div>
                 <div :class="['badge-' + (selectedLog.severity || 'low').toLowerCase()]">
@@ -321,7 +317,7 @@
               </div>
             </div>
             <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-4 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group/card relative overflow-hidden">
-              <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
+              <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
               <div class="relative z-10">
                 <div class="text-xs text-slate-400 uppercase tracking-wide mb-2 font-medium">Action</div>
                 <div class="text-lg font-semibold" :class="(selectedLog.raw?.action || selectedLog.raw_data?.action) === 'ALLOW' ? 'text-emerald-400' : 'text-red-400'">
@@ -330,7 +326,7 @@
               </div>
             </div>
             <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-4 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group/card relative overflow-hidden">
-              <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
+              <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
               <div class="relative z-10">
                 <div class="text-xs text-slate-400 uppercase tracking-wide mb-2 font-medium">Timestamp</div>
                 <div class="text-sm text-slate-300">{{ formatFullTime(selectedLog.timestamp) }}</div>
@@ -340,7 +336,7 @@
 
           <!-- Registry Information -->
           <div v-if="selectedLog.log_type === 'Registry'" class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-5 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group/card relative overflow-hidden">
-            <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
+            <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
             <h4 class="text-sm font-semibold text-slate-50 mb-4 flex items-center relative z-10">
               <i class="fas fa-database mr-2 text-cyan-400"></i>
               Registry Information
@@ -381,7 +377,7 @@
 
           <!-- Network Information (for non-Registry logs) -->
           <div v-if="selectedLog.log_type !== 'Registry'" class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-5 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group/card relative overflow-hidden">
-            <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
+            <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
             <h4 class="text-sm font-semibold text-slate-50 mb-4 flex items-center relative z-10">
               <i class="fas fa-network-wired mr-2 text-cyan-400"></i>
               Network Information
@@ -430,7 +426,7 @@
 
           <!-- Geo Location (if available) -->
           <div v-if="selectedLog.geo" class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-5 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group/card relative overflow-hidden">
-            <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
+            <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
             <h4 class="text-sm font-semibold text-slate-50 mb-4 flex items-center relative z-10">
               <i class="fas fa-globe mr-2 text-cyan-400"></i>
               Geographic Information
@@ -453,7 +449,7 @@
 
           <!-- Raw Log Data -->
           <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-5 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group/card relative overflow-hidden">
-            <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
+            <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
             <div class="flex items-center justify-between mb-4 relative z-10">
               <h4 class="text-sm font-semibold text-slate-50 flex items-center">
                 <i class="fas fa-code mr-2 text-cyan-400"></i>
@@ -496,7 +492,7 @@
               @click="exportLog(selectedLog)"
               class="px-4 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/50 text-cyan-400 hover:border-cyan-400 hover:shadow-lg hover:shadow-cyan-500/30 transition-all duration-300 text-sm font-medium group relative overflow-hidden"
             >
-              <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <i class="fas fa-download mr-2"></i>
               <span class="relative">Export</span>
             </button>
@@ -577,12 +573,14 @@ import { useLogStore } from '../stores/logStore'
 import { useAPIStore } from '../stores/apiStore'
 import { useToast } from '../composables/useToast'
 import { normalizeSeverity, getSeverityClass, getSeverityLabel } from '../utils/severityNormalization'
+import { STANDARD_LOG_TYPES, getDisplayName } from '../utils/logTypeConstants'
+import { logsAPI } from '../api/logs'
 import axios from 'axios'
 
 const logStore = useLogStore()
 const apiStore = useAPIStore()
 const { addToast, toasts, removeToast } = useToast()
-const logTypes = ['All', 'Firewall', 'IDS', 'Authentication', 'App', 'System', 'Registry']
+const logTypes = ref(['All', ...STANDARD_LOG_TYPES.map(type => getDisplayName(type))])
 const selectedLogType = ref('All')
 const filterSeverity = ref('')
 const filterTimeRange = ref('24h')
@@ -592,11 +590,20 @@ const selectedLog = ref(null)
 const isLoading = ref(false)
 const displayLimit = ref(20)
 
-onMounted(() => {
-  // Fetch logs from backend like LogViewer does
-  apiStore.fetchRecentLogs(1000)
-  // Fetch dashboard stats to get severity breakdown
-  apiStore.fetchDashboardStats()
+onMounted(async () => {
+  console.log('LogTypes component mounted')
+  
+  // Fetch logs from backend
+  await apiStore.fetchRecentLogs()
+  console.log('Logs fetched:', {
+    totalLogs: (apiStore.logs || []).length,
+    sampleLogTypes: (apiStore.logs || []).slice(0, 5).map(l => l.log_type)
+  })
+  
+  // Fetch dashboard stats
+  await apiStore.fetchDashboardStats()
+  
+  console.log('Using standardized log types:', logTypes.value)
 })
 
 // Watch for filter changes and apply them
@@ -608,6 +615,16 @@ watch([selectedLogType, filterSeverity, filterTimeRange, filterAction, filterSou
     filterAction: newValues[3], 
     filterSourceIP: newValues[4] 
   })
+  
+  // Log sample of available logs for debugging
+  const sampleLogs = (apiStore.logs || []).slice(0, 3)
+  console.log('Sample logs for debugging:', sampleLogs.map(log => ({
+    log_type: log.log_type,
+    severity: log.severity,
+    source_ip: log.source_ip,
+    timestamp: log.timestamp
+  })))
+  
   // Reset display limit when filters change
   displayLimit.value = 20
 })
@@ -616,14 +633,26 @@ const logsOfSelectedType = computed(() => {
   let logs = []
   
   if (selectedLogType.value === 'All') {
-    // Use the fetched logs from apiStore (1000 logs from backend)
+    // Use the fetched logs from apiStore
     logs = apiStore.logs || []
-  } else if (selectedLogType.value === 'Registry') {
-    logs = logStore.registryLogs || []
   } else {
-    // Filter logs by selected log type from apiStore.logs
-    logs = (apiStore.logs || []).filter(l => l.log_type === selectedLogType.value)
+    // Convert display name back to internal log type for filtering
+    const internalLogType = STANDARD_LOG_TYPES.find(type => getDisplayName(type) === selectedLogType.value) || selectedLogType.value
+    
+    // Filter logs by exact log type match
+    logs = (apiStore.logs || []).filter(log => {
+      const logType = log.log_type || 'system'
+      return logType === internalLogType
+    })
   }
+  
+  console.log('Logs of selected type:', { 
+    selectedType: selectedLogType.value, 
+    totalLogs: (apiStore.logs || []).length,
+    filteredLogs: logs.length,
+    sampleLogTypes: logs.slice(0, 5).map(l => l.log_type),
+    uniqueLogTypes: [...new Set((apiStore.logs || []).map(l => l.log_type))]
+  })
   
   return logs
 })
@@ -665,24 +694,40 @@ const filteredLogs = computed(() => {
 })
 
 const criticalCount = computed(() => {
-  // Use backend severity breakdown (same as Dashboard)
-  // CRITICAL: All pages must use the same source for consistency
-  return apiStore.severityBreakdown.find(s => s._id === 'Critical')?.count || 0
+  // Count critical logs from currently filtered logs (by log type)
+  return logsOfSelectedType.value.filter(log => {
+    const normalizedSeverity = normalizeSeverity(log.severity)
+    return normalizedSeverity === 'Critical'
+  }).length
 })
 
 const highCount = computed(() => {
-  // Use backend severity breakdown (same as Dashboard)
-  return apiStore.severityBreakdown.find(s => s._id === 'High')?.count || 0
-})
-
-const lowCount = computed(() => {
-  // Use backend severity breakdown (same as Dashboard)
-  return apiStore.severityBreakdown.find(s => s._id === 'Low')?.count || 0
+  // Count high logs from currently filtered logs (by log type)
+  return logsOfSelectedType.value.filter(log => {
+    const normalizedSeverity = normalizeSeverity(log.severity)
+    return normalizedSeverity === 'High'
+  }).length
 })
 
 const mediumCount = computed(() => {
-  // Use backend severity breakdown (same as Dashboard)
-  return apiStore.severityBreakdown.find(s => s._id === 'Medium')?.count || 0
+  // Count medium logs from currently filtered logs (by log type)
+  return logsOfSelectedType.value.filter(log => {
+    const normalizedSeverity = normalizeSeverity(log.severity)
+    return normalizedSeverity === 'Medium'
+  }).length
+})
+
+const lowCount = computed(() => {
+  // Count low logs from currently filtered logs (by log type)
+  return logsOfSelectedType.value.filter(log => {
+    const normalizedSeverity = normalizeSeverity(log.severity)
+    return normalizedSeverity === 'Low'
+  }).length
+})
+
+const totalFilteredCount = computed(() => {
+  // Total count of logs for selected log type
+  return logsOfSelectedType.value.length
 })
 
 const severityDistribution = computed(() => [
@@ -719,19 +764,39 @@ const closeLogDetails = () => {
 const handleLogTypesSearch = async () => {
   isLoading.value = true
   try {
-    // Always fetch fresh data when search is triggered
-    await apiStore.fetchRecentLogs(1000)
+    // Convert display name back to internal log type if needed
+    let internalLogType = null
+    if (selectedLogType.value !== 'All') {
+      internalLogType = STANDARD_LOG_TYPES.find(type => getDisplayName(type) === selectedLogType.value) || selectedLogType.value
+    }
     
-    // If we have specific filters, we might want to fetch more targeted data
-    if (filterSourceIP.value || filterSeverity.value) {
-      // The computed properties will handle the filtering
-      addToast(`Applied filters - Found ${filteredLogs.value.length} logs`, 'success')
-    } else {
-      addToast(`Loaded ${logsOfSelectedType.value.length} ${selectedLogType.value} logs`, 'success')
+    // Use the logsAPI to fetch filtered logs
+    const response = await logsAPI.getRecent(1000, filterSeverity.value, internalLogType)
+    
+    if (response && response.data) {
+      // Update the apiStore with filtered results
+      apiStore.logs = response.data
+      console.log('Filtered logs fetched:', {
+        total: response.total,
+        returned: response.data.length,
+        filters: {
+          logType: selectedLogType.value,
+          severity: filterSeverity.value,
+          timeRange: filterTimeRange.value
+        }
+      })
+      
+      addToast({
+        type: 'success',
+        message: `Found ${response.data.length} logs matching your filters`
+      })
     }
   } catch (error) {
-    console.error('Search failed:', error)
-    addToast('Failed to apply filters', 'error')
+    console.error('Error fetching filtered logs:', error)
+    addToast({
+      type: 'error',
+      message: 'Failed to fetch logs. Please try again.'
+    })
   } finally {
     isLoading.value = false
   }
@@ -868,8 +933,8 @@ const exportLog = (log) => {
 
 const exportLogs = async () => {
   try {
-    // Get real data from backend API
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api'
+    // Get real data from backend API - FIXED: Use correct port 3002
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3002/api'
     
     // Build query parameters based on current filters
     const params = {

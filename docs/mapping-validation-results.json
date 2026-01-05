@@ -1,0 +1,170 @@
+{
+  "timestamp": "2026-01-04T17:30:29.881Z",
+  "sampleSize": 1000,
+  "classificationStats": {
+    "total": 1000,
+    "auth": 3,
+    "network": 314,
+    "firewall": 1,
+    "application": 1,
+    "database": 0,
+    "system": 681,
+    "registry": 0,
+    "fim": 0
+  },
+  "overallValidation": {
+    "totalSources": 22,
+    "totalLogs": 74901,
+    "categoryStats": {
+      "auth": {
+        "sources": 3,
+        "logs": 246,
+        "sourceNames": [
+          "windows_authentication (209)",
+          "authentication (33)",
+          "UnifiedAuth (4)"
+        ]
+      },
+      "network": {
+        "sources": 3,
+        "logs": 24119,
+        "sourceNames": [
+          "network_snapshot (22914)",
+          "NetworkMonitor (1122)",
+          "tailscale (83)"
+        ]
+      },
+      "firewall": {
+        "sources": 1,
+        "logs": 95,
+        "sourceNames": [
+          "windows_Microsoft-Windows-Windows Firewall With Advanced Security/Firewall (95)"
+        ]
+      },
+      "application": {
+        "sources": 4,
+        "logs": 353,
+        "sourceNames": [
+          "nginx-access (234)",
+          "windows_Application (95)",
+          "web-api (14)",
+          "apache-access (10)"
+        ]
+      },
+      "database": {
+        "sources": 0,
+        "logs": 0,
+        "sourceNames": []
+      },
+      "system": {
+        "sources": 10,
+        "logs": 50083,
+        "sourceNames": [
+          "/var/log/syslog (42702)",
+          "windows_Security (5357)",
+          "kernel (1562)",
+          "Security (212)",
+          "windows_System (138)",
+          "windows_Microsoft-Windows-Windows Defender/Operational (95)",
+          "linux-audit (6)",
+          "sudoers (5)",
+          "test-script (4)",
+          "windows_defender (2)"
+        ]
+      },
+      "registry": {
+        "sources": 0,
+        "logs": 0,
+        "sourceNames": []
+      },
+      "fim": {
+        "sources": 1,
+        "logs": 5,
+        "sourceNames": [
+          "FIM (5)"
+        ]
+      }
+    },
+    "unclassifiedSources": [
+      {
+        "source": "test-script",
+        "count": 4
+      }
+    ],
+    "coverageByVolume": "99.99"
+  },
+  "manualAssessment": [
+    {
+      "source": "/var/log/syslog",
+      "count": 42702,
+      "expected": "system",
+      "classified": "system",
+      "accurate": true
+    },
+    {
+      "source": "network_snapshot",
+      "count": 22914,
+      "expected": "network",
+      "classified": "network",
+      "accurate": true
+    },
+    {
+      "source": "windows_Security",
+      "count": 5357,
+      "expected": "system",
+      "classified": "system",
+      "accurate": true
+    },
+    {
+      "source": "kernel",
+      "count": 1562,
+      "expected": "system",
+      "classified": "system",
+      "accurate": true
+    },
+    {
+      "source": "NetworkMonitor",
+      "count": 1122,
+      "expected": "network",
+      "classified": "network",
+      "accurate": true
+    },
+    {
+      "source": "nginx-access",
+      "count": 234,
+      "expected": "application",
+      "classified": "application",
+      "accurate": true
+    },
+    {
+      "source": "Security",
+      "count": 212,
+      "expected": "system",
+      "classified": "system",
+      "accurate": true
+    },
+    {
+      "source": "windows_authentication",
+      "count": 209,
+      "expected": "auth",
+      "classified": "auth",
+      "accurate": true
+    },
+    {
+      "source": "windows_System",
+      "count": 138,
+      "expected": "system",
+      "classified": "system",
+      "accurate": true
+    },
+    {
+      "source": "windows_Application",
+      "count": 95,
+      "expected": "application",
+      "classified": "application",
+      "accurate": true
+    }
+  ],
+  "accuracyPercentage": 100,
+  "recommendations": []
+}

@@ -65,6 +65,7 @@ import profileRoutes from './routes/profile.js'
 import geoRoutes from './routes/geo.js'
 import tailscaleStreamRoutes from './routes/tailscale-stream.js'
 import agentRoutes from './routes/agents.js'
+import casesRoutes from './routes/cases.js'
 
 // Logger setup
 const logger = winston.createLogger({
@@ -239,7 +240,8 @@ const routes = [
   { path: '/profile', router: profileRoutes },
   { path: '/geo', router: geoRoutes },
   { path: '/tailscale-stream', router: tailscaleStreamRoutes },
-  { path: '/agents', router: agentRoutes }
+  { path: '/agents', router: agentRoutes },
+  { path: '/cases', router: casesRoutes }
 ];
 
 // Register all routes

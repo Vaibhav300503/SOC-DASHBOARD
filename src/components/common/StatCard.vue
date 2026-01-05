@@ -2,15 +2,15 @@
   <div
     :class="[
       'rounded-xl border backdrop-blur-sm p-5',
-      'bg-gradient-to-br from-slate-800/40 to-slate-900/40',
-      'transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/20',
-      'border-slate-700/30 hover:border-cyan-500/50',
+      'bg-card-primary',
+      'transition-all duration-300 hover:shadow-card-hover',
+      'border-card-border-default hover:border-card-border-hover',
       'group relative overflow-hidden',
       accentClass
     ]"
   >
     <!-- Animated gradient background on hover -->
-    <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+    <div class="absolute inset-0 bg-hover-overlay opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
     <!-- Top accent line -->
     <div :class="['h-0.5 -mx-5 -mt-5 mb-4 transition-all duration-300', accentLineClass]"></div>
@@ -18,14 +18,14 @@
     <!-- Header -->
     <div class="flex items-start justify-between mb-3 relative z-10">
       <div>
-        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">{{ label }}</p>
-        <p v-if="sublabel" class="text-xs text-slate-500 mt-0.5">{{ sublabel }}</p>
+        <p class="text-xs font-medium text-text-secondary uppercase tracking-wider">{{ label }}</p>
+        <p v-if="sublabel" class="text-xs text-text-muted mt-0.5">{{ sublabel }}</p>
       </div>
       <div
         v-if="icon"
         :class="[
           'w-9 h-9 rounded-lg flex items-center justify-center',
-          'transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg',
+          'transition-all duration-300 group-hover:scale-110',
           iconBgClass
         ]"
       >
@@ -122,10 +122,10 @@ const severityColors = {
     line: 'bg-gradient-to-r from-emerald-500/0 via-emerald-500/50 to-emerald-500/0'
   },
   normal: {
-    value: 'text-cyan-400',
-    bg: 'bg-cyan-500/10',
-    icon: 'text-cyan-400',
-    line: 'bg-gradient-to-r from-cyan-500/0 via-cyan-500/50 to-cyan-500/0'
+    value: 'text-accent-primary',
+    bg: 'bg-accent-primary/10',
+    icon: 'text-accent-primary',
+    line: 'bg-gradient-to-r from-accent-primary/0 via-accent-primary/50 to-accent-primary/0'
   },
   info: {
     value: 'text-purple-400',
@@ -145,7 +145,7 @@ const accentClass = computed(() => {
     high: 'border-l-4 border-l-orange-500/50',
     medium: 'border-l-4 border-l-yellow-500/50',
     low: 'border-l-4 border-l-emerald-500/50',
-    normal: 'border-l-4 border-l-cyan-500/50',
+    normal: 'border-l-4 border-l-accent-primary/50',
     info: 'border-l-4 border-l-purple-500/50'
   }
   return colors[props.severity] || colors.normal
