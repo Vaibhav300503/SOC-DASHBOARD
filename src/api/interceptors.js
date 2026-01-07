@@ -8,6 +8,7 @@ export const setupInterceptors = () => {
   // Request interceptor - add token to headers
   axios.interceptors.request.use(
     (config) => {
+      // Get fresh auth store instance for each request
       const authStore = useAuthStore()
       
       // Check if we're in demo mode
@@ -22,9 +23,13 @@ export const setupInterceptors = () => {
           demo: true 
         }))
         config.headers.Authorization = `Bearer ${demoToken}`
+        console.log('Demo mode: Using demo token for request:', config.url)
       } else if (authStore.token) {
         // For real backend authentication
         config.headers.Authorization = `Bearer ${authStore.token}`
+        console.log('Real mode: Using JWT token for request:', config.url)
+      } else {
+        console.warn('No token available for request to:', config.url)
       }
       
       return config

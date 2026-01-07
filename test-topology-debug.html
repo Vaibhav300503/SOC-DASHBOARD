@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Topology Debug</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #0f172a;
+            color: #e2e8f0;
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #38bdf8;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #38bdf8;
+            padding-bottom: 10px;
+        }
+        
+        h2 {
+            color: #0ea5e9;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        
+        .section {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin: 0 4px;
+        }
+        
+        .status.success { background: #10b981; color: white; }
+        .status.error { background: #ef4444; color: white; }
+        .status.warning { background: #f59e0b; color: white; }
+        .status.info { background: #0ea5e9; color: white; }
+        
+        .agent-card {
+            background: #0f172a;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .agent-info {
+            flex: 1;
+        }
+        
+        .agent-name {
+            font-weight: bold;
+            color: #38bdf8;
+            margin-bottom: 4px;
+        }
+        
+        .agent-details {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        
+        .agent-status {
+            text-align: right;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-badge.active { background: #10b981; }
+        .status-badge.inactive { background: #ef4444; }
+        .status-badge.degraded { background: #f59e0b; }
+        
+        button {
+            background: #0ea5e9;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            margin: 4px;
+        }
+        
+        button:hover {
+            background: #0284c7;
+        }
+        
+        .json-display {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 4px;
+            padding: 12px;
+            overflow-x: auto;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .loading {
+            color: #f59e0b;
+        }
+        
+        .error-message {
+            background: #7f1d1d;
+            border: 1px solid #dc2626;
+            color: #fca5a5;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .success-message {
+            background: #064e3b;
+            border: 1px solid #10b981;
+            color: #86efac;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin: 15px 0;
+        }
+        
+        .stat-box {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #38bdf8;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Network Topology Debug Console</h1>
+        
+        <div class="section">
+            <h2>System Status</h2>
+            <div>
+                <span class="status info">Frontend: http://localhost:3003</span>
+                <span class="status info">Backend: http://localhost:3002</span>
+                <span class="status info">API: /api/agents</span>
+            </div>
+            <div style="margin-top: 15px;">
+                <button onclick="testConnection()">Test Connection</button>
+                <button onclick="fetchAgents()">Fetch Agents</button>
+                <button onclick="clearCache()">Clear Cache</button>
+                <button onclick="autoRefresh()">Auto Refresh (5s)</button>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Connection Test</h2>
+            <div id="connection-status"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Agent Statistics</h2>
+            <div class="stats-grid" id="stats-grid"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Agent List</h2>
+            <div id="agent-list"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Raw API Response</h2>
+            <div class="json-display" id="json-response">
+                <p class="loading">Waiting for data...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let autoRefreshInterval = null;
+        
+        async function testConnection() {
+            const statusDiv = document.getElementById('connection-status');
+            statusDiv.innerHTML = '<p class="loading">Testing connection...</p>';
+            
+            try {
+                const response = await fetch('/api/agents');
+                const data = await response.json();
+                
+                if (data.success) {
+                    statusDiv.innerHTML = `
+                        <p class="success-message">
+                            ✅ Connection successful!<br>
+                            API returned ${data.data.length} agents
+                        </p>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        <p class="error-message">
+                            ❌ API Error: ${data.error}
+                        </p>
+                    `;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <p class="error-message">
+                        ❌ Connection failed: ${error.message}
+                    </p>
+                `;
+            }
+        }
+        
+        async function fetchAgents() {
+            const agentList = document.getElementById('agent-list');
+            const jsonResponse = document.getElementById('json-response');
+            const statsGrid = document.getElementById('stats-grid');
+            
+            agentList.innerHTML = '<p class="loading">Loading agents...</p>';
+            
+            try {
+                const response = await fetch('/api/agents');
+                const data = await response.json();
+                
+                if (!data.success) {
+                    agentList.innerHTML = `<p class="error-message">Error: ${data.error}</p>`;
+                    return;
+                }
+                
+                const agents = data.data;
+                
+                // Update stats
+                const stats = {
+                    total: agents.length,
+                    active: agents.filter(a => a.status === 'active').length,
+                    inactive: agents.filter(a => a.status === 'inactive').length,
+                    degraded: agents.filter(a => a.status === 'degraded').length
+                };
+                
+                statsGrid.innerHTML = `
+                    <div class="stat-box">
+                        <div class="stat-number">${stats.total}</div>
+                        <div class="stat-label">Total Agents</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" style="color: #10b981;">${stats.active}</div>
+                        <div class="stat-label">Online</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" style="color: #ef4444;">${stats.inactive}</div>
+                        <div class="stat-label">Offline</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" style="color: #f59e0b;">${stats.degraded}</div>
+                        <div class="stat-label">Degraded</div>
+                    </div>
+                `;
+                
+                // Update agent list
+                agentList.innerHTML = agents.map(agent => {
+                    const statusColor = {
+                        'active': '#10b981',
+                        'inactive': '#ef4444',
+                        'degraded': '#f59e0b'
+                    }[agent.status] || '#6b7280';
+                    
+                    const lastSeen = new Date(agent.last_seen).toLocaleString();
+                    
+                    return `
+                        <div class="agent-card">
+                            <div class="agent-info">
+                                <div class="agent-name">${agent.endpoint_name}</div>
+                                <div class="agent-details">
+                                    ID: ${agent.agent_id}<br>
+                                    IP: ${agent.ip_address}<br>
+                                    OS: ${agent.os_type}<br>
+                                    Last Seen: ${lastSeen}
+                                </div>
+                            </div>
+                            <div class="agent-status">
+                                <span class="status-badge ${agent.status}"></span>
+                                <div style="font-size: 12px; color: #94a3b8;">
+                                    ${agent.status}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                // Update JSON response
+                jsonResponse.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+            } catch (error) {
+                agentList.innerHTML = `<p class="error-message">Error: ${error.message}</p>`;
+                jsonResponse.innerHTML = `<p class="error-message">Error: ${error.message}</p>`;
+            }
+        }
+        
+        function clearCache() {
+            localStorage.clear();
+            sessionStorage.clear();
+            location.reload();
+        }
+        
+        function autoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                alert('Auto-refresh stopped');
+                return;
+            }
+            
+            fetchAgents();
+            autoRefreshInterval = setInterval(fetchAgents, 5000);
+            alert('Auto-refresh started (5 seconds)');
+        }
+        
+        // Auto-load on page load
+        window.addEventListener('load', () => {
+            testConnection();
+            fetchAgents();
+        });
+    </script>
+</body>
+</html>

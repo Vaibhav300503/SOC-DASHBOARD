@@ -1,0 +1,16 @@
+1. logs filteration 
+2. map location
+3. login bypass disable it 
+4. clearing unwanted files 
+5. changing map from raven to new 
+6. creating how to use md file
+7. creating a file that include needed node to install in one click 
+8. re-checking cases intigration from mongo and hive is correct or not ?
+9. fix it to use real data rather than sample 
+24
+Logins
+12
+Alerts
+8
+Reports
+10. fix nortification to show critical or high logs in it of recent 2m

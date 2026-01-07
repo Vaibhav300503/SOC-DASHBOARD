@@ -135,6 +135,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, watch, ref } from 'vue'
 import { useAPIStore } from '../../stores/apiStore'
+import { formatTimestamp } from '../../utils/timestampFormatter.js'
 
 const apiStore = useAPIStore()
 const isLoading = ref(true)
@@ -290,7 +291,7 @@ const getSeverityColor = (severity) => {
 const formatTime = (timestamp) => {
   if (!timestamp) return 'Unknown time'
   try {
-    return new Date(timestamp).toLocaleString()
+    return formatTimestamp(timestamp, 'datetime')
   } catch (err) {
     console.error('EndpointTimeline: Error formatting time:', err)
     return 'Invalid time'

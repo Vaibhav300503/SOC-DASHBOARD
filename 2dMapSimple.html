@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYART - Attack Flow Map</title>
+    <style>
+        @import url('https://fonts.cdnfonts.com/css/kiona');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Montserrat:wght@400;700&family=Outfit:wght@400;700&display=swap');
+        
+        :root {
+          --font-octa: 'Outfit', sans-serif;
+          --font-tech: 'JetBrains Mono', monospace;
+          --font-brand: 'Kiona', 'Montserrat', sans-serif;
+        }
+
+        body { 
+          font-family: var(--font-octa);
+          background-color: #000000;
+          margin: 0;
+          color: #888;
+          overflow: hidden;
+        }
+        
+        .font-brand { font-family: var(--font-brand); font-weight: 400; }
+        .font-tech { font-family: var(--font-tech); }
+        
+        .container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: #000;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 50;
+            transition: all 0.7s;
+            background: transparent;
+            padding: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            cursor: pointer;
+        }
+
+        .logo-icon {
+            position: relative;
+            width: 2rem;
+            height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-border {
+            position: absolute;
+            inset: 0;
+            border: 1px solid rgba(51, 255, 85, 0.2);
+            transform: rotate(45deg);
+        }
+
+        .logo-shield {
+            width: 1rem;
+            height: 1rem;
+            color: rgba(51, 255, 85, 0.8);
+        }
+
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 400;
+            letter-spacing: 0.4em;
+            line-height: 1;
+            color: rgba(203, 213, 225, 0.3);
+            text-transform: uppercase;
+        }
+
+        .stats {
+            display: flex;
+            gap: 2.5rem;
+            font-family: var(--font-tech);
+        }
+
+        .stat-item {
+            text-align: right;
+        }
+
+        .stat-label {
+            font-size: 0.5625rem;
+            color: rgba(107, 114, 128, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            line-height: 1;
+        }
+
+        .main-content {
+            flex: 1;
+            min-height: 0;
+            position: relative;
+            margin-top: 6rem;
+        }
+
+        .map-overlay {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            z-index: 20;
+            display: flex;
+            gap: 1rem;
+            font-family: var(--font-tech);
+            pointer-events: auto;
+        }
+
+        .overlay-card {
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid rgba(51, 255, 85, 0.1);
+            padding: 0.5rem;
+            backdrop-filter: blur(12px);
+            border-radius: 0.25rem;
+        }
+
+        .overlay-label {
+            font-size: 0.5625rem;
+            color: rgba(107, 114, 128, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.25rem;
+        }
+
+        .overlay-value {
+            font-size: 1.125rem;
+            font-weight: 700;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            font-family: var(--font-tech);
+        }
+
+        .zoom-button {
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid rgba(51, 255, 85, 0.1);
+            color: rgba(51, 255, 85, 0.8);
+            padding: 0.5rem;
+            backdrop-filter: blur(12px);
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 1.125rem;
+            font-weight: 700;
+            width: 2.5rem;
+            height: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .zoom-button:hover {
+            background: rgba(51, 255, 85, 0.1);
+            border-color: rgba(51, 255, 85, 0.3);
+            color: rgba(51, 255, 85, 1);
+        }
+
+        .zoom-button:active {
+            transform: scale(0.95);
+        }
+
+        .zoom-level {
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid rgba(255, 153, 0, 0.1);
+            color: rgba(255, 153, 0, 0.8);
+            padding: 0.5rem;
+            backdrop-filter: blur(12px);
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-align: center;
+            min-width: 3rem;
+        }
+
+        .map-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            border-top: 1px solid rgba(51, 255, 85, 0.05);
+            border-bottom: 1px solid rgba(51, 255, 85, 0.05);
+            overflow: hidden;
+            border-radius: 0.25rem;
+        }
+
+        .world-map {
+            position: absolute;
+            inset: 0;
+            opacity: 0.2;
+            pointer-events: none;
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+            filter: invert(1) sepia(1) hue-rotate(95deg) saturate(2) brightness(0.4) contrast(1.5);
+        }
+
+        #attackCanvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+        }
+
+        .bottom-stats {
+            height: 15rem;
+            flex-shrink: 0;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+            font-family: var(--font-tech);
+            padding: 0.5rem;
+        }
+
+        .stat-card {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background: #000;
+            border: 1px solid rgba(51, 255, 85, 0.1);
+            backdrop-filter: blur(12px);
+            border-radius: 0.25rem;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            border-color: rgba(51, 255, 85, 0.3);
+        }
+
+        .stat-header {
+            background: rgba(17, 17, 17, 1);
+            padding: 0.5rem;
+            border-bottom: 1px solid rgba(51, 255, 85, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stat-title {
+            font-size: 0.625rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .stat-content {
+            padding: 0.5rem;
+            flex: 1;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        .stat-item {
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.5625rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-name {
+            color: rgba(107, 114, 128, 0.5);
+        }
+
+        .stat-count {
+            font-weight: 700;
+        }
+
+        .progress-bar {
+            height: 0.25rem;
+            width: 100%;
+            background: rgba(10, 10, 10, 1);
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 9999px;
+            transition: all 1s;
+            opacity: 0.8;
+        }
+
+        .alert-feed {
+            background: #000;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            border-radius: 0.25rem;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .alert-feed:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .alert-header {
+            background: rgba(17, 17, 17, 1);
+            padding: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .alert-title {
+            font-size: 0.625rem;
+            color: rgba(156, 163, 175, 0.4);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .alert-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .alert-dot {
+            position: relative;
+            width: 0.375rem;
+            height: 0.375rem;
+        }
+
+        .alert-dot-ping {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: rgba(239, 68, 68, 0.5);
+            animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+
+        .alert-dot-core {
+            position: relative;
+            border-radius: 50%;
+            background: rgba(239, 68, 68, 1);
+            width: 100%;
+            height: 100%;
+        }
+
+        @keyframes ping {
+            75%, 100% {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+
+        .alert-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+            font-family: var(--font-tech);
+            font-size: 0.5625rem;
+            background: rgba(0, 0, 0, 0.6);
+        }
+
+        .alert-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .alert-th {
+            padding: 0.25rem;
+            font-weight: 400;
+            text-transform: uppercase;
+            color: rgba(107, 114, 128, 0.6);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            text-align: left;
+        }
+
+        .alert-th:last-child {
+            text-align: right;
+        }
+
+        .alert-td {
+            padding: 0.25rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s;
+        }
+
+        .alert-row:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .alert-time {
+            color: rgba(107, 114, 128, 0.7);
+        }
+
+        .alert-target {
+            color: rgba(156, 163, 175, 0.4);
+        }
+
+        .alert-vector {
+            font-weight: 700;
+        }
+
+        .alert-port {
+            text-align: right;
+            color: rgba(107, 114, 128, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <div class="logo-border"></div>
+                    <svg class="logo-shield" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+                    </svg>
+                </div>
+                <span class="logo-text">CYART</span>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-label">Total Threats</div>
+                    <div class="stat-value" style="color: rgba(255, 153, 0, 0.9)" id="totalThreats">452,901</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Status</div>
+                    <div class="stat-value" style="color: rgba(255, 51, 51, 0.9); animation: pulse 2s infinite;" id="status">LIVE</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <div class="map-overlay">
+                <div class="overlay-card">
+                    <div class="overlay-label">Active Vectors</div>
+                    <div class="overlay-value" style="color: rgba(51, 255, 85, 0.8)">TRACKING</div>
+                </div>
+                <div class="overlay-card">
+                    <div class="overlay-label">Attack Intensity</div>
+                    <div class="overlay-value" style="color: rgba(255, 153, 0, 0.8)">MODERATE</div>
+                </div>
+            </div>
+            
+            <div class="zoom-controls">
+                <button class="zoom-button" onclick="zoomIn()" title="Zoom In (+)">+</button>
+                <div class="zoom-level" id="zoomLevel" title="Current Zoom Level">100%</div>
+                <button class="zoom-button" onclick="zoomOut()" title="Zoom Out (-)">−</button>
+                <button class="zoom-button" onclick="resetZoom()" title="Reset Zoom (0)">⟲</button>
+            </div>
+            
+            <div class="map-container">
+                <div class="world-map" style="background-image: url('https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg');"></div>
+                <canvas id="attackCanvas"></canvas>
+            </div>
+        </div>
+
+        <div class="bottom-stats">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title" style="color: rgba(255, 153, 0, 1)">Inbound Sources</div>
+                    <svg width="12" height="12" style="color: rgba(255, 153, 0, 0.3)" fill="currentColor" viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    </svg>
+                </div>
+                <div class="stat-content" id="srcStats"></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title" style="color: rgba(51, 255, 85, 1)">Target Clusters</div>
+                    <svg width="12" height="12" style="color: rgba(51, 255, 85, 0.3)" fill="currentColor" viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    </svg>
+                </div>
+                <div class="stat-content" id="dstStats"></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title" style="color: rgba(0, 242, 255, 1)">Vector Protocols</div>
+                    <svg width="12" height="12" style="color: rgba(0, 242, 255, 0.3)" fill="currentColor" viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    </svg>
+                </div>
+                <div class="stat-content" id="protocolStats"></div>
+            </div>
+            <div class="alert-feed">
+                <div class="alert-header">
+                    <div class="alert-title">Security Stream</div>
+                    <div class="alert-indicator">
+                        <div class="alert-dot">
+                            <div class="alert-dot-ping"></div>
+                            <div class="alert-dot-core"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert-content">
+                    <table class="alert-table">
+                        <thead>
+                            <tr>
+                                <th class="alert-th">TIME</th>
+                                <th class="alert-th">TARGET</th>
+                                <th class="alert-th">VECTOR</th>
+                                <th class="alert-th">PRT</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alertTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global constants
+        const MAX_LOGS = 30;
+        
+        const ATTACK_TYPES = [
+            { name: "SMB (445)", color: "#ff4d4d" },
+            { name: "Telnet (23)", color: "#00f2ff" },
+            { name: "SSH (22)", color: "#ffee00" },
+            { name: "HTTP (80)", color: "#ff00ff" },
+            { name: "RDP (3389)", color: "#3d5afe" },
+        ];
+
+        const REGIONS = [
+            { name: "California, USA", lat: 36.7783, lon: -119.4179 },
+            { name: "Texas, USA", lat: 31.9686, lon: -99.9018 },
+            { name: "New York, USA", lat: 40.7128, lon: -74.0060 },
+            { name: "Florida, USA", lat: 27.6648, lon: -81.5158 },
+            { name: "Washington, USA", lat: 47.7511, lon: -120.7401 },
+            { name: "Ontario, CAN", lat: 51.2538, lon: -85.3232 },
+            { name: "Quebec, CAN", lat: 52.9399, lon: -73.5491 },
+            { name: "Bavaria, DEU", lat: 48.7904, lon: 11.4979 },
+            { name: "Ile-de-France, FRA", lat: 48.8566, lon: 2.3522 },
+            { name: "England, GBR", lat: 52.3555, lon: -1.1743 },
+            { name: "Lombardy, ITA", lat: 45.4791, lon: 9.8453 },
+            { name: "Madrid, ESP", lat: 40.4168, lon: -3.7038 },
+            { name: "Moscow Oblast, RUS", lat: 55.7558, lon: 37.6173 },
+            { name: "Tokyo, JPN", lat: 35.6762, lon: 139.6503 },
+            { name: "Osaka, JPN", lat: 34.6937, lon: 135.5023 },
+            { name: "Guangdong, CHN", lat: 23.3790, lon: 113.7633 },
+            { name: "Zhejiang, CHN", lat: 29.1832, lon: 120.0934 },
+            { name: "Maharashtra, IND", lat: 19.7515, lon: 75.7139 },
+            { name: "Karnataka, IND", lat: 15.3173, lon: 75.7139 },
+            { name: "Seoul, KOR", lat: 37.5665, lon: 126.9780 },
+            { name: "NSW, AUS", lat: -31.2532, lon: 146.9211 },
+            { name: "Victoria, AUS", lat: -37.4713, lon: 144.7852 },
+            { name: "Sao Paulo, BRA", lat: -23.5505, lon: -46.6333 },
+            { name: "Buenos Aires, ARG", lat: -34.6037, lon: -58.3816 },
+            { name: "Gauteng, ZAF", lat: -26.2708, lon: 28.1123 },
+            { name: "Lagos, NGA", lat: 6.5244, lon: 3.3792 },
+            { name: "Cairo, EGY", lat: 30.0444, lon: 31.2357 },
+        ];
+
+        // State
+        let activeAttacks = [];
+        let logs = [];
+        let stats = { total: 452901 };
+        let srcData = [
+            { name: "Russia", count: 45021 },
+            { name: "China", count: 32104 },
+            { name: "USA", count: 21004 },
+            { name: "Netherlands", count: 15400 },
+            { name: "Brazil", count: 12040 },
+        ];
+        let dstData = [
+            { name: "USA", count: 89002 },
+            { name: "Germany", count: 45001 },
+            { name: "Japan", count: 32004 },
+            { name: "UK", count: 28000 },
+            { name: "India", count: 15000 },
+        ];
+        let protocolData = ATTACK_TYPES.map(t => ({...t, count: 5000}));
+
+        // Canvas setup
+        const canvas = document.getElementById('attackCanvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let ripples = [];
+        let labels = [];
+        
+        // Geospatial configuration
+        let mapConfig = {
+            projection: 'mercator',
+            zoom: 1,
+            minZoom: 0.5,
+            maxZoom: 5,
+            centerLat: 0,
+            centerLon: 0,
+            bounds: {
+                minLat: -85,
+                maxLat: 85,
+                minLon: -180,
+                maxLon: 180
+            }
+        };
+
+        // Zoom controls
+        function zoomIn() {
+            const newZoom = Math.min(mapConfig.zoom * 1.5, mapConfig.maxZoom);
+            if (newZoom !== mapConfig.zoom) {
+                mapConfig.zoom = newZoom;
+                updateZoomDisplay();
+                console.log('Zoomed in to:', mapConfig.zoom);
+            }
+        }
+
+        function zoomOut() {
+            const newZoom = Math.max(mapConfig.zoom / 1.5, mapConfig.minZoom);
+            if (newZoom !== mapConfig.zoom) {
+                mapConfig.zoom = newZoom;
+                updateZoomDisplay();
+                console.log('Zoomed out to:', mapConfig.zoom);
+            }
+        }
+
+        function resetZoom() {
+            mapConfig.zoom = 1;
+            updateZoomDisplay();
+            console.log('Zoom reset to:', mapConfig.zoom);
+        }
+
+        function updateZoomDisplay() {
+            const zoomLevelElement = document.getElementById('zoomLevel');
+            if (zoomLevelElement) {
+                zoomLevelElement.textContent = Math.round(mapConfig.zoom * 100) + '%';
+            }
+        }
+
+        // Mouse wheel zoom
+        function handleWheel(event) {
+            if (event.ctrlKey) {
+                event.preventDefault();
+                const delta = event.deltaY > 0 ? 0.9 : 1.1;
+                const newZoom = Math.max(mapConfig.minZoom, Math.min(mapConfig.maxZoom, mapConfig.zoom * delta));
+                
+                if (newZoom !== mapConfig.zoom) {
+                    mapConfig.zoom = newZoom;
+                    updateZoomDisplay();
+                    console.log('Wheel zoom to:', mapConfig.zoom);
+                }
+            }
+        }
+
+        // Improved projection system with proper zoom and scaling
+        function project(lat, lon, width, height) {
+            // Validate input coordinates
+            if (typeof lat !== 'number' || typeof lon !== 'number' || 
+                isNaN(lat) || isNaN(lon) ||
+                lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+                console.warn('Invalid coordinates:', { lat, lon });
+                return { x: width / 2, y: height / 2 };
+            }
+            
+            // Apply zoom and center
+            const zoomedLat = (lat - mapConfig.centerLat) / mapConfig.zoom + mapConfig.centerLat;
+            const zoomedLon = (lon - mapConfig.centerLon) / mapConfig.zoom + mapConfig.centerLon;
+            
+            // Use Web Mercator projection (EPSG:3857)
+            const x = (zoomedLon + 180) * (width / 360);
+            
+            // Mercator Y projection with bounds checking
+            const latRad = zoomedLat * Math.PI / 180;
+            const mercatorY = Math.log(Math.tan((Math.PI / 4) + (latRad / 2)));
+            const y = (height / 2) - (width * mercatorY / (2 * Math.PI));
+            
+            // Clamp to canvas bounds
+            const clampedX = Math.max(0, Math.min(width, x));
+            const clampedY = Math.max(0, Math.min(height, y));
+            
+            return { x: clampedX, y: clampedY };
+        }
+
+        // Calculate optimal zoom based on canvas aspect ratio
+        function calculateOptimalZoom(width, height) {
+            const aspectRatio = width / height;
+            const worldAspectRatio = 2; // World is twice as wide as tall in Mercator
+            
+            if (aspectRatio > worldAspectRatio) {
+                // Canvas is wider than world - fit to height
+                return height / (width * Math.PI);
+            } else {
+                // Canvas is taller than world - fit to width
+                return 1.0;
+            }
+        }
+
+        // Resize canvas with proper projection recalculation
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            const newWidth = container.clientWidth;
+            const newHeight = container.clientHeight;
+            
+            // Only resize if dimensions actually changed
+            if (canvas.width !== newWidth || canvas.height !== newHeight) {
+                canvas.width = newWidth;
+                canvas.height = newHeight;
+                
+                // Recalculate zoom for new dimensions
+                mapConfig.zoom = calculateOptimalZoom(newWidth, newHeight);
+                
+                console.log('Canvas resized:', { width: newWidth, height: newHeight, zoom: mapConfig.zoom });
+            }
+        }
+
+        // Validate geographic coordinates
+        function validateCoordinates(lat, lon) {
+            return typeof lat === 'number' && typeof lon === 'number' &&
+                   !isNaN(lat) && !isNaN(lon) &&
+                   lat >= -90 && lat <= 90 &&
+                   lon >= -180 && lon <= 180;
+        }
+
+        // Get projected position with validation
+        function getProjectedPosition(lat, lon, width, height) {
+            if (!validateCoordinates(lat, lon)) {
+                console.warn('Invalid coordinates for projection:', { lat, lon });
+                return { x: width / 2, y: height / 2, valid: false };
+            }
+            
+            const pos = project(lat, lon, width, height);
+            return { ...pos, valid: true };
+        }
+
+        // Update stats displays
+        function updateStats() {
+            document.getElementById('totalThreats').textContent = stats.total.toLocaleString();
+            
+            // Update source stats
+            const srcContainer = document.getElementById('srcStats');
+            srcContainer.innerHTML = '';
+            srcData.forEach(item => {
+                const percent = Math.max((item.count / (stats.total * 0.2 + 50000)) * 100, 2);
+                srcContainer.innerHTML += `
+                    <div class="stat-item">
+                        <div class="stat-row">
+                            <span class="stat-name">${item.name}</span>
+                            <span class="stat-count" style="color: #ff9900">${item.count.toLocaleString()}</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${percent}%; background-color: #ff9900;"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Update destination stats
+            const dstContainer = document.getElementById('dstStats');
+            dstContainer.innerHTML = '';
+            dstData.forEach(item => {
+                const percent = Math.max((item.count / (stats.total * 0.2 + 100000)) * 100, 2);
+                dstContainer.innerHTML += `
+                    <div class="stat-item">
+                        <div class="stat-row">
+                            <span class="stat-name">${item.name}</span>
+                            <span class="stat-count" style="color: #33ff55">${item.count.toLocaleString()}</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${percent}%; background-color: #33ff55;"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Update protocol stats
+            const protocolContainer = document.getElementById('protocolStats');
+            protocolContainer.innerHTML = '';
+            protocolData.forEach(item => {
+                const percent = Math.max((item.count / stats.total) * 100, 2);
+                protocolContainer.innerHTML += `
+                    <div class="stat-item">
+                        <div class="stat-row">
+                            <span class="stat-name">${item.name}</span>
+                            <span class="stat-count" style="color: ${item.color}">${item.count.toLocaleString()}</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${percent}%; background-color: ${item.color};"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Update alert feed
+            const alertBody = document.getElementById('alertTableBody');
+            alertBody.innerHTML = '';
+            logs.forEach(log => {
+                const time = new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit'});
+                const target = log.destination.name.split(',')[0];
+                const vector = log.type.name.split(' ')[0];
+                const port = log.type.name.match(/\((\d+)\)/)?.[1] || '80';
+                
+                alertBody.innerHTML += `
+                    <tr class="alert-row">
+                        <td class="alert-td alert-time">${time}</td>
+                        <td class="alert-td alert-target">${target}</td>
+                        <td class="alert-td alert-vector" style="color: ${log.type.color}">${vector}</td>
+                        <td class="alert-td alert-port">${port}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Animation loop with improved coordinate handling
+        function animate() {
+            if (!canvas || !canvas.parentElement) return;
+            
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            // Draw particles with validated coordinates
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.progress += p.speed;
+                
+                // Validate source and destination coordinates
+                const startPos = getProjectedPosition(p.source.lat, p.source.lon, width, height);
+                const endPos = getProjectedPosition(p.destination.lat, p.destination.lon, width, height);
+                
+                // Skip invalid coordinates
+                if (!startPos.valid || !endPos.valid) {
+                    console.warn('Skipping attack with invalid coordinates:', p);
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                if (p.progress >= 1) {
+                    labels.push({ 
+                        text: p.destination.name, 
+                        lat: p.destination.lat, 
+                        lon: p.destination.lon, 
+                        life: 1.0, 
+                        color: p.color 
+                    });
+                    ripples.push({ 
+                        x: endPos.x, 
+                        y: endPos.y, 
+                        radius: 0, 
+                        maxRadius: 20, 
+                        alpha: 0.8, 
+                        color: p.color 
+                    });
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                // Calculate curved path with proper geographic consideration
+                const dx = endPos.x - startPos.x;
+                const dy = endPos.y - startPos.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                // Adjust curve intensity based on distance and geographic logic
+                const curveIntensity = Math.min(dist * 0.3, 150);
+                const controlX = ((startPos.x + endPos.x) / 2) + (-dy / (dist || 1) * curveIntensity);
+                const controlY = ((startPos.y + endPos.y) / 2) + (dx / (dist || 1) * curveIntensity);
+
+                // Quadratic Bezier curve for smooth attack path
+                const t = p.progress;
+                const x = (1-t)**2 * startPos.x + 2*(1-t)*t * controlX + t**2 * endPos.x;
+                const y = (1-t)**2 * startPos.y + 2*(1-t)*t * controlY + t**2 * endPos.y;
+
+                // Draw attack path with gradient
+                const gradient = ctx.createLinearGradient(startPos.x, startPos.y, endPos.x, endPos.y);
+                gradient.addColorStop(0, p.color);
+                gradient.addColorStop(1, p.color + "22");
+
+                ctx.beginPath();
+                ctx.moveTo(startPos.x, startPos.y);
+                ctx.quadraticCurveTo(controlX, controlY, x, y);
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = 2;
+                ctx.globalAlpha = 0.6;
+                ctx.stroke();
+                
+                // Draw attack particle
+                ctx.beginPath();
+                ctx.fillStyle = p.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = p.color;
+                ctx.arc(x, y, 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1.0;
+            }
+
+            // Draw ripples
+            for (let i = ripples.length - 1; i >= 0; i--) {
+                const r = ripples[i];
+                r.radius += 0.4;
+                r.alpha -= 0.02;
+                if (r.alpha <= 0) {
+                    ripples.splice(i, 1);
+                    continue;
+                }
+                ctx.beginPath();
+                ctx.strokeStyle = r.color;
+                ctx.globalAlpha = r.alpha;
+                ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+            }
+
+            // Draw labels with proper projection
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 13px "JetBrains Mono", monospace';
+            
+            for (let i = labels.length - 1; i >= 0; i--) {
+                const l = labels[i];
+                l.life -= 0.008;
+                
+                const pos = getProjectedPosition(l.lat, l.lon, width, height);
+                if (!pos.valid || l.life <= 0) {
+                    labels.splice(i, 1);
+                    continue;
+                }
+
+                ctx.globalAlpha = l.life;
+                ctx.fillStyle = l.color;
+                ctx.shadowBlur = 4;
+                ctx.shadowColor = 'rgba(0,0,0,1)';
+                
+                const stateName = l.text.split(',')[0].toUpperCase();
+                ctx.fillText(stateName, pos.x, pos.y - 15 - (1.0 - l.life) * 20);
+                
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1.0;
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // Add new attack with coordinate validation
+        function addAttack(attack) {
+            // Validate attack data structure
+            if (!attack || !attack.source || !attack.destination || !attack.type) {
+                console.warn('Invalid attack structure:', attack);
+                return;
+            }
+            
+            // Validate coordinates
+            const sourceValid = validateCoordinates(attack.source.lat, attack.source.lon);
+            const destValid = validateCoordinates(attack.destination.lat, attack.destination.lon);
+            
+            if (!sourceValid || !destValid) {
+                console.warn('Attack has invalid coordinates:', {
+                    source: { lat: attack.source.lat, lon: attack.source.lon, valid: sourceValid },
+                    destination: { lat: attack.destination.lat, lon: attack.destination.lon, valid: destValid }
+                });
+                return;
+            }
+            
+            // Check if attack already exists
+            if (!particles.find(p => p.id === attack.id)) {
+                // Add source label
+                labels.push({ 
+                    text: attack.source.name, 
+                    lat: attack.source.lat, 
+                    lon: attack.source.lon, 
+                    life: 1.0, 
+                    color: attack.type.color 
+                });
+                
+                // Add attack particle with validated coordinates
+                particles.push({ 
+                    id: attack.id, 
+                    source: attack.source, 
+                    destination: attack.destination, 
+                    color: attack.type.color, 
+                    progress: 0, 
+                    speed: 0.003 + (Math.random() * 0.003),
+                    timestamp: Date.now()
+                });
+                
+                console.log('Added valid attack:', {
+                    id: attack.id,
+                    source: attack.source.name,
+                    destination: attack.destination.name,
+                    type: attack.type.name
+                });
+            }
+            
+            // Update logs
+            logs.unshift(attack);
+            if (logs.length > MAX_LOGS) logs.pop();
+            
+            // Update stats
+            stats.total++;
+            
+            // Update statistics data
+            const srcCountry = attack.source.name.split(', ')[1] || 'Global';
+            const dstCountry = attack.destination.name.split(', ')[1] || 'Global';
+            
+            const srcExists = srcData.find(c => c.name === srcCountry);
+            if (srcExists) {
+                srcExists.count++;
+            } else {
+                srcData.push({ name: srcCountry, count: 1 });
+                srcData.sort((a,b) => b.count - a.count).slice(0, 5);
+            }
+            
+            const dstExists = dstData.find(c => c.name === dstCountry);
+            if (dstExists) {
+                dstExists.count++;
+            } else {
+                dstData.push({ name: dstCountry, count: 1 });
+                dstData.sort((a,b) => b.count - a.count).slice(0, 5);
+            }
+            
+            const typeIdx = ATTACK_TYPES.findIndex(t => t.name === attack.type.name);
+            if (typeIdx !== -1) {
+                protocolData[typeIdx].count++;
+            }
+            
+            updateStats();
+            
+            // Remove attack after 8 seconds
+            setTimeout(() => {
+                particles = particles.filter(p => p.id !== attack.id);
+            }, 8000);
+        }
+
+        // Handle fullscreen and resize events
+        function handleFullscreenChange() {
+            setTimeout(() => {
+                resizeCanvas();
+                console.log('Fullscreen changed, projection recalculated');
+            }, 100);
+        }
+
+        // Initialize with proper event listeners
+        function initialize() {
+            // Set initial canvas size and zoom
+            resizeCanvas();
+            
+            // Add event listeners
+            window.addEventListener('resize', resizeCanvas);
+            window.addEventListener('fullscreenchange', handleFullscreenChange);
+            window.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+            window.addEventListener('mozfullscreenchange', handleFullscreenChange);
+            window.addEventListener('MSFullscreenChange', handleFullscreenChange);
+            
+            // Add mouse wheel zoom support
+            canvas.addEventListener('wheel', handleWheel, { passive: false });
+            
+            // Add keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    switch(e.key) {
+                        case '+':
+                        case '=':
+                            e.preventDefault();
+                            zoomIn();
+                            break;
+                        case '-':
+                        case '_':
+                            e.preventDefault();
+                            zoomOut();
+                            break;
+                        case '0':
+                            e.preventDefault();
+                            resetZoom();
+                            break;
+                    }
+                }
+            });
+            
+            // Initialize zoom display
+            updateZoomDisplay();
+            
+            // Start animation
+            updateStats();
+            animate();
+            
+            console.log('Attack map initialized with projection:', mapConfig);
+        }
+
+        // Initialize application
+        initialize();
+        
+        // WebSocket connection
+        const ws = new WebSocket('ws://localhost:3001');
+        
+        ws.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            if (message.type === 'attack') {
+                addAttack(message.data);
+            }
+        };
+        
+        ws.onopen = () => {
+            console.log('Connected to attack flow server');
+            console.log('Map projection config:', mapConfig);
+        };
+        
+        ws.onerror = (error) => console.error('WebSocket error:', error);
+        ws.onclose = () => console.log('Disconnected from attack flow server');
+    </script>
+</body>
+</html>

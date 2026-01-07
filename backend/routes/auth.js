@@ -1,6 +1,6 @@
-import express from 'express'
-import User from '../models/User.js'
-import { generateToken, verifyToken } from '../middleware/auth.js'
+import express from 'express';
+import User from '../models/User.js';
+import { generateToken, verifyToken } from '../middleware/auth.js';
 
 const router = express.Router()
 
@@ -36,9 +36,9 @@ router.post('/register', (req, res, next) => {
     }
 
     // Split name into firstName and lastName
-    const nameParts = (name || '').split(' ')
+    const nameParts = (name || '').split(' ').filter(part => part.trim() !== '')
     const firstName = nameParts[0] || email.split('@')[0]
-    const lastName = nameParts.slice(1).join(' ') || ''
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'User'
 
     // Generate username from email
     const username = email.split('@')[0] + Math.floor(Math.random() * 1000)

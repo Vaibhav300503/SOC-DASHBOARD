@@ -76,6 +76,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/authStore'
+import { formatTimestamp } from '../../utils/timestampFormatter.js'
 
 const authStore = useAuthStore()
 const refreshing = ref(false)
@@ -94,7 +95,7 @@ const userRole = computed(() => {
 const loginTime = computed(() => {
   const loginTimestamp = localStorage.getItem('loginTime')
   if (!loginTimestamp) return 'N/A'
-  return new Date(parseInt(loginTimestamp)).toLocaleTimeString()
+  return formatTimestamp(parseInt(loginTimestamp), 'time')
 })
 
 const sessionDuration = computed(() => {

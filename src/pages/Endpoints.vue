@@ -101,19 +101,19 @@
 
     <!-- Endpoint Statistics -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <div class="stat-card card-accent-cyan">
+      <div class="stat-card card-accent-cyan text-center-left">
         <div class="stat-value text-accent-primary">{{ uniqueEndpoints }}</div>
         <div class="stat-label">Total Endpoints</div>
       </div>
-      <div class="stat-card card-accent-red">
+      <div class="stat-card card-accent-red text-center-left">
         <div class="stat-value text-neon-red">{{ criticalEndpoints }}</div>
         <div class="stat-label">Critical Endpoints</div>
       </div>
-      <div class="stat-card card-accent-orange">
+      <div class="stat-card card-accent-orange text-center-left">
         <div class="stat-value text-neon-orange">{{ avgErrorRate }}%</div>
         <div class="stat-label">Avg Error Rate</div>
       </div>
-      <div class="stat-card card-accent-green">
+      <div class="stat-card card-accent-green text-center-left">
         <div class="stat-value text-neon-green text-lg truncate">{{ mostActiveEndpoint }}</div>
         <div class="stat-label">Most Active</div>
       </div>
@@ -236,9 +236,11 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
 import { useAPIStore } from '../stores/apiStore'
 import { useAuthStore } from '../stores/authStore'
 import { useToast } from '../composables/useToast.js'
+import { formatTimestamp } from '../utils/timestampFormatter.js'
 import EndpointTimeline from '../components/soc/EndpointTimeline.vue'
 
 const apiStore = useAPIStore()
@@ -248,23 +250,38 @@ const searchEndpoint = ref('')
 const showSuggestions = ref(false)
 const highlightedIndex = ref(-1)
 const searchResults = ref([])
+const aggregatedEndpoints = ref([])
 
 onMounted(async () => {
-  await Promise.all([
-    apiStore.fetchRecentLogs(),
-    apiStore.fetchAgents(),
-    apiStore.fetchDashboardStats() // Ensure we have topSourceIPs data
-  ])
+  try {
+    // Fetch aggregated endpoints from optimized endpoint
+    const response = await axios.get('http://localhost:3002/api/logs/endpoints/aggregated')
+    aggregatedEndpoints.value = response.data?.data || []
+    console.log(`✅ Loaded ${aggregatedEndpoints.value.length} endpoints from aggregated endpoint`)
+  } catch (error) {
+    console.error('❌ Failed to fetch aggregated endpoints:', error)
+    addToast('Failed to load endpoints', 'error')
+  }
+  
+  // Fetch recent logs for the "Recent Related Logs" section
+  try {
+    await apiStore.fetchRecentLogs(100)
+  } catch (error) {
+    console.error('Failed to fetch recent logs:', error)
+  }
+  
+  // Also fetch dashboard stats for other metrics
+  await apiStore.fetchDashboardStats()
 })
 
 // Refresh data function
 const refreshData = async () => {
   console.log('Refreshing data...')
   try {
-    await Promise.all([
-      apiStore.fetchRecentLogs(),
-      apiStore.fetchDashboardStats()
-    ])
+    const response = await axios.get('http://localhost:3002/api/logs/endpoints/aggregated')
+    aggregatedEndpoints.value = response.data?.data || []
+    await apiStore.fetchRecentLogs(100)
+    await apiStore.fetchDashboardStats()
     console.log('Data refreshed successfully')
     addToast('Data refreshed successfully', 'success')
   } catch (error) {
@@ -350,36 +367,35 @@ const getEndpointCount = (endpoint) => {
 }
 
 const viewEndpointDetails = (endpointName) => {
-  const endpointLogs = apiStore.logs.filter(log => log.endpoint === endpointName)
-  addToast(`Viewing details for ${endpointName} (${endpointLogs.length} logs)`, 'info')
-  console.log(`Endpoint ${endpointName} logs:`, endpointLogs)
+  const endpointData = aggregatedEndpoints.value.find(ep => ep.endpoint === endpointName)
+  if (endpointData) {
+    addToast(`Viewing details for ${endpointName} (${endpointData.total_count} logs)`, 'info')
+    console.log(`Endpoint ${endpointName} data:`, endpointData)
+  } else {
+    addToast(`Endpoint ${endpointName} not found`, 'warning')
+  }
 }
 
 const uniqueEndpoints = computed(() => {
-  const endpoints = new Set((apiStore.logs || []).map(l => l.endpoint))
-  return endpoints.size
+  return aggregatedEndpoints.value.length
 })
 
 const criticalEndpoints = computed(() => {
-  const endpoints = new Set(
-    apiStore.logs.filter(l => l.severity === 'Critical').map(l => l.endpoint)
-  )
-  return endpoints.size
+  return aggregatedEndpoints.value.filter(ep => ep.critical_count > 0).length
 })
 
 const avgErrorRate = computed(() => {
-  if (!apiStore.logs || apiStore.logs.length === 0) return '0.0'
-  const errorLogs = apiStore.logs.filter(l => (l.raw?.action || l.raw_data?.action || l.action) === 'DENY')
-  return ((errorLogs.length / apiStore.logs.length) * 100).toFixed(1)
+  if (!aggregatedEndpoints.value || aggregatedEndpoints.value.length === 0) return '0.0'
+  const totalEvents = aggregatedEndpoints.value.reduce((sum, ep) => sum + (ep.total_count || 0), 0)
+  const totalErrors = aggregatedEndpoints.value.reduce((sum, ep) => sum + (ep.error_count || 0), 0)
+  if (totalEvents === 0) return '0.0'
+  return ((totalErrors / totalEvents) * 100).toFixed(1)
 })
 
 const mostActiveEndpoint = computed(() => {
-  const endpoints = {}
-  apiStore.logs.forEach(log => {
-    endpoints[log.endpoint] = (endpoints[log.endpoint] || 0) + 1
-  })
-  const sorted = Object.entries(endpoints).sort((a, b) => b[1] - a[1])
-  return sorted.length > 0 ? sorted[0][0] : 'N/A'
+  if (!aggregatedEndpoints.value || aggregatedEndpoints.value.length === 0) return 'N/A'
+  const sorted = [...aggregatedEndpoints.value].sort((a, b) => (b.total_count || 0) - (a.total_count || 0))
+  return sorted.length > 0 ? sorted[0].endpoint : 'N/A'
 })
 
 const topAttackingIPs = computed(() => {
@@ -414,66 +430,26 @@ const topAttackingIPs = computed(() => {
 })
 
 const endpointList = computed(() => {
-  const endpoints = {}
-  
-  // First, initialize with all known agents
-  apiStore.agents.forEach(agent => {
-    endpoints[agent.endpoint_name] = {
-      name: agent.endpoint_name,
-      totalEvents: 0,
-      critical: 0,
-      errorRate: 0,
-      lastActivity: agent.last_seen ? new Date(agent.last_seen).toLocaleTimeString() : 'Never',
-      status: agent.status === 'active' ? 'Active' : 'Inactive',
-      ip: agent.ip_address,
-      os: agent.os_type
-    }
-  })
-
-  // Then, add data from logs
-  apiStore.logs.forEach(log => {
-    const endpointName = log.endpoint || log.metadata?.endpoint_name || log.raw_data?.endpoint_name || 'Unknown'
-    
-    if (!endpoints[endpointName]) {
-      endpoints[endpointName] = {
-        name: endpointName,
-        totalEvents: 0,
-        critical: 0,
-        errorRate: 0,
-        lastActivity: new Date(log.timestamp).toLocaleTimeString(),
-        status: 'Active',
-      }
-    }
-    
-    endpoints[endpointName].totalEvents++
-    const severity = log.severity || log.metadata?.severity || 'Low'
-    if (severity === 'Critical') endpoints[endpointName].critical++
-    
-    const action = log.raw?.action || log.raw_data?.action || 'ALLOW'
-    if (action === 'DENY') endpoints[endpointName].errorRate++
-    
-    // Update last activity if newer
-    const logTime = new Date(log.timestamp)
-    if (!endpoints[endpointName].lastActivityDate || logTime > endpoints[endpointName].lastActivityDate) {
-      endpoints[endpointName].lastActivityDate = logTime
-      endpoints[endpointName].lastActivity = logTime.toLocaleTimeString()
-    }
-  })
-
-  return Object.values(endpoints).map(ep => ({
-    ...ep,
-    errorRate: ep.totalEvents > 0 ? ((ep.errorRate / ep.totalEvents) * 100).toFixed(1) : '0.0',
+  // Map aggregated endpoint data to display format
+  return aggregatedEndpoints.value.map(ep => ({
+    name: ep.endpoint || 'Unknown',
+    totalEvents: ep.total_count || 0,
+    critical: ep.critical_count || 0,
+    errorRate: ep.total_count > 0 ? ((ep.error_count || 0) / ep.total_count * 100).toFixed(1) : '0.0',
+    lastActivity: ep.last_timestamp ? formatTimestamp(ep.last_timestamp, 'time') : 'N/A',
+    status: 'Active',
   }))
 })
 
 const recentLogs = computed(() => {
-  return [...apiStore.logs].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+  // Use apiStore logs for recent logs display
+  // These are fetched separately for the "Recent Related Logs" section
+  return [...(apiStore.logs || [])].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
 })
 
 // Get all unique endpoints for suggestions
 const allEndpoints = computed(() => {
-  const endpoints = new Set(apiStore.logs.map(l => l.endpoint))
-  return Array.from(endpoints).sort()
+  return aggregatedEndpoints.value.map(ep => ep.endpoint).sort()
 })
 
 // Filter suggestions based on search input
@@ -492,7 +468,7 @@ const getSeverityClass = (count) => {
 }
 
 const formatTime = (timestamp) => {
-  return new Date(timestamp).toLocaleString()
+  return formatTimestamp(timestamp, 'datetime')
 }
 
 const getSeverityClassFromSeverity = (severity) => {

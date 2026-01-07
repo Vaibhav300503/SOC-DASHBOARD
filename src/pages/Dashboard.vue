@@ -3,8 +3,8 @@
     <!-- Page Header -->
     <div class="flex items-center justify-between mb-2">
       <div>
-        <h1 class="text-2xl font-bold text-slate-50 tracking-tight">Security Operations Center</h1>
-        <p class="text-slate-400 mt-1 text-sm">Real-time threat monitoring and analysis</p>
+        <h1 class="text-3xl font-black title-gradient tracking-tight">Security Operations Center</h1>
+        <p class="text-slate-dark-400 mt-2 font-medium opacity-80">Real-time threat monitoring and analysis</p>
       </div>
       <div class="flex gap-3">
         <button 
@@ -28,55 +28,55 @@
 
     <!-- Key Stats -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-      <div class="card-glass rounded-xl p-5">
+      <div class="stat-card-info p-5">
         <div class="flex items-center justify-between mb-3">
-          <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Events</div>
-          <div class="w-9 h-9 rounded-lg bg-cyan-500/10 flex items-center justify-center">
-            <i class="fas fa-file-alt text-cyan-400 text-sm"></i>
+          <div class="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Total Events</div>
+          <div class="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center">
+            <i class="fas fa-file-alt text-blue-400 text-sm"></i>
           </div>
         </div>
-        <div class="text-3xl font-bold text-slate-50">{{ apiStore.total.toLocaleString() }}</div>
+        <div class="text-3xl font-bold text-[var(--text-primary-headings)]">{{ apiStore.total.toLocaleString() }}</div>
         <div class="text-xs font-medium text-emerald-400 mt-2 flex items-center gap-1">
           <i class="fas fa-arrow-up text-[10px]"></i>
           {{ calculateLogGrowth() }}
         </div>
       </div>
 
-      <div class="card-glass rounded-xl p-5">
+      <div class="stat-card-critical p-5">
         <div class="flex items-center justify-between mb-3">
-          <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Critical</div>
+          <div class="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Critical</div>
           <div class="w-9 h-9 rounded-lg bg-red-500/10 flex items-center justify-center">
             <i class="fas fa-exclamation-circle text-red-400 text-sm"></i>
           </div>
         </div>
         <div class="text-3xl font-bold text-red-400">{{ getCriticalCount() }}</div>
-        <div class="text-xs font-medium text-slate-500 mt-2">
+        <div class="text-xs font-medium text-[var(--text-muted)] mt-2">
           Requires immediate attention
         </div>
       </div>
 
-      <div class="card-glass rounded-xl p-5">
+      <div class="stat-card-warning p-5">
         <div class="flex items-center justify-between mb-3">
-          <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">High Priority</div>
-          <div class="w-9 h-9 rounded-lg bg-orange-500/10 flex items-center justify-center">
-            <i class="fas fa-radiation text-orange-400 text-sm"></i>
+          <div class="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">High Priority</div>
+          <div class="w-9 h-9 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+            <i class="fas fa-radiation text-yellow-400 text-sm"></i>
           </div>
         </div>
-        <div class="text-3xl font-bold text-orange-400">{{ getHighCount() }}</div>
-        <div class="text-xs font-medium text-slate-500 mt-2">
+        <div class="text-3xl font-bold text-yellow-400">{{ getHighCount() }}</div>
+        <div class="text-xs font-medium text-[var(--text-muted)] mt-2">
           Under investigation
         </div>
       </div>
 
-      <div class="card-glass rounded-xl p-5">
+      <div class="stat-card-success p-5">
         <div class="flex items-center justify-between mb-3">
-          <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Active Hosts</div>
+          <div class="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Active Hosts</div>
           <div class="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center">
             <i class="fas fa-server text-emerald-400 text-sm"></i>
           </div>
         </div>
         <div class="text-3xl font-bold text-emerald-400">{{ apiStore.uniqueHosts }}</div>
-        <div class="text-xs font-medium text-slate-500 mt-2">
+        <div class="text-xs font-medium text-[var(--text-muted)] mt-2">
           Monitored endpoints
         </div>
       </div>
@@ -84,41 +84,41 @@
 
     <!-- Alert & Case Metrics -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-      <div class="card-glass rounded-xl p-5">
+      <div class="stat-card-info p-5">
         <div class="flex items-center justify-between mb-3">
-          <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Alerts</div>
+          <div class="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Total Alerts</div>
           <div class="w-9 h-9 rounded-lg bg-purple-500/10 flex items-center justify-center">
             <i class="fas fa-bell text-purple-400 text-sm"></i>
           </div>
         </div>
         <div class="text-3xl font-bold text-purple-400">{{ apiStore.totalAlerts }}</div>
-        <div class="text-xs font-medium text-slate-500 mt-2">
+        <div class="text-xs font-medium text-[var(--text-muted)] mt-2">
           System generated alerts
         </div>
       </div>
 
-      <div class="card-glass rounded-xl p-5">
+      <div class="stat-card-critical p-5">
         <div class="flex items-center justify-between mb-3">
-          <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Critical Alerts</div>
+          <div class="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Critical Alerts</div>
           <div class="w-9 h-9 rounded-lg bg-red-500/10 flex items-center justify-center">
             <i class="fas fa-radiation-alt text-red-400 text-sm"></i>
           </div>
         </div>
         <div class="text-3xl font-bold text-red-400">{{ apiStore.criticalAlerts }}</div>
-        <div class="text-xs font-medium text-slate-500 mt-2">
+        <div class="text-xs font-medium text-[var(--text-muted)] mt-2">
           Potential security breaches
         </div>
       </div>
 
-      <div class="card-glass rounded-xl p-5">
+      <div class="stat-card-success p-5">
         <div class="flex items-center justify-between mb-3">
-          <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Analyzed Alerts</div>
-          <div class="w-9 h-9 rounded-lg bg-cyan-500/10 flex items-center justify-center">
-            <i class="fas fa-microscope text-cyan-400 text-sm"></i>
+          <div class="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Analyzed Alerts</div>
+          <div class="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+            <i class="fas fa-microscope text-emerald-400 text-sm"></i>
           </div>
         </div>
-        <div class="text-3xl font-bold text-cyan-400">{{ apiStore.analyzedAlerts }}</div>
-        <div class="text-xs font-medium text-slate-500 mt-2">
+        <div class="text-3xl font-bold text-emerald-400">{{ apiStore.analyzedAlerts }}</div>
+        <div class="text-xs font-medium text-[var(--text-muted)] mt-2">
           Verified security threats
         </div>
       </div>
@@ -151,12 +151,12 @@
     </div>
 
     <!-- Log Type Distribution -->
-    <div class="card-glass p-7 rounded-xl">
-      <h3 class="text-lg font-semibold text-slate-50 mb-6">Log Types Distribution</h3>
+    <div class="card-glass p-7">
+      <h3 class="text-lg font-semibold text-[var(--text-primary-headings)] mb-6">Log Types Distribution</h3>
       <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div v-for="item in getLogTypeDistribution()" :key="item.name" class="bg-slate-800/30 rounded-lg p-4 border border-slate-700/40 text-center hover:bg-slate-800/50 transition-colors">
-          <div class="text-2xl font-bold text-cyan-400">{{ item.value }}</div>
-          <div class="text-xs text-slate-400 mt-2 font-medium">{{ item.name }}</div>
+        <div v-for="item in getLogTypeDistribution()" :key="item.name" class="card-inner text-center hover:border-[var(--border-card-hover)] transition-colors">
+          <div class="text-2xl font-bold text-blue-400">{{ item.value }}</div>
+          <div class="text-xs text-[var(--text-secondary)] mt-2 font-medium">{{ item.name }}</div>
         </div>
       </div>
     </div>
@@ -251,6 +251,7 @@
 import { onMounted, computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAPIStore } from '../stores/apiStore'
+import { formatTimestamp } from '../utils/timestampFormatter.js'
 import NetworkGraphLight from '../components/soc/NetworkGraphLight.vue'
 import SeverityChart from '../components/soc/SeverityChart.vue'
 import IpTable from '../components/soc/IpTable.vue'
@@ -269,7 +270,7 @@ const lastRefreshAt = ref(0)
  
 const formatTime = (timestamp) => {
   if (!timestamp) return 'Unknown'
-  return new Date(timestamp).toLocaleString()
+  return formatTimestamp(timestamp, 'datetime')
 }
 
 const getCriticalCount = () => {

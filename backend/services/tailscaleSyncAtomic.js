@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import TailscaleDevice from '../models/TailscaleDevice.js';
+import TailscaleLog from '../models/TailscaleLog.js';
 import { validateDeviceBatch } from '../middleware/tailscaleValidation.js';
 import geoip from 'geoip-lite';
 import tailscaleService from './tailscale.js';
@@ -291,12 +292,12 @@ class AtomicTailscaleSyncService {
       }));
       
       // Check for existing logs to avoid duplicates
-      const existingTimestamps = await TailscaleLog.distinct('timestamp', {
+      const existingTimestamps = await TailscaleLog.distinct('ts', {
         source: 'sync_audit'
       });
       
       const newLogs = normalizedLogs.filter(log => 
-        !existingTimestamps.includes(log.timestamp)
+        !existingTimestamps.includes(log.ts?.toISOString?.() || log.ts)
       );
       
       if (newLogs.length > 0) {
@@ -309,6 +310,10 @@ class AtomicTailscaleSyncService {
       return { fetched: logs.length, inserted: newLogs.length };
       
     } catch (error) {
+      if (error.response?.status === 404) {
+        secureLogger.warn('Audit log endpoint returned 404 - skipping sync for this cycle');
+        return { fetched: 0, inserted: 0, status: 404 };
+      }
       secureLogger.error('Failed to sync audit logs', {
         error: error.message
       });

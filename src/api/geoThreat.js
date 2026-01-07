@@ -1,97 +1,62 @@
 /**
- * Geo Threat API - Geographic threat data
+ * Geo Threat API (deprecated - using 2dMap.jsx)
+ * All functions are deprecated as they were used by Raven threat map components
  */
-
-import axios from 'axios'
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3002/api'
 
 export const geoThreatAPI = {
   /**
-   * Get live threat map data
+   * Get live threat map data (deprecated)
    */
   getLiveThreatMapData: async (timeRange = '24h') => {
-    try {
-      const response = await axios.get(`${API_BASE}/geo/threat-map`, {
-        params: { timeRange }
-      })
-      return response.data
-    } catch (error) {
-      console.error('Error fetching live threat map data:', error)
-      throw error
-    }
+    console.warn('getLiveThreatMapData is deprecated. Use 2dMap.jsx instead.')
+    return { data: [] }
   },
 
   /**
-   * Get threat flows (attack paths)
+   * Get threat flows (attack paths) (deprecated)
    */
   getThreatFlows: async (timeRange = '24h', limit = 100) => {
-    try {
-      const response = await axios.get(`${API_BASE}/geo/threat-flows`, {
-        params: { timeRange, limit }
-      })
-      return response.data
-    } catch (error) {
-      console.error('Error fetching threat flows:', error)
-      throw error
-    }
+    console.warn('getThreatFlows is deprecated. Use 2dMap.jsx instead.')
+    return { data: [] }
   },
 
   /**
-   * Get threat statistics
+   * Get threat statistics (deprecated)
    */
   getThreatStats: async (timeRange = '24h') => {
-    try {
-      const response = await axios.get(`${API_BASE}/geo/threat-stats`, {
-        params: { timeRange }
-      })
-      return response.data
-    } catch (error) {
-      console.error('Error fetching threat stats:', error)
-      throw error
-    }
+    console.warn('getThreatStats is deprecated. Use 2dMap.jsx instead.')
+    return { stats: {} }
   },
 
   /**
-   * Get critical threats
+   * Get critical threats (deprecated)
    */
   getCriticalThreats: async (limit = 50) => {
-    try {
-      const response = await axios.get(`${API_BASE}/geo/critical-threats`, {
-        params: { limit }
-      })
-      return response.data
-    } catch (error) {
-      console.error('Error fetching critical threats:', error)
-      throw error
-    }
+    console.warn('getCriticalThreats is deprecated. Use 2dMap.jsx instead.')
+    return { data: [] }
   },
 
   /**
-   * Get threat history for a country
+   * Get threat heatmap data (deprecated)
+   */
+  getThreatHeatmap: async (timeRange = '24h') => {
+    console.warn('getThreatHeatmap is deprecated. Use 2dMap.jsx instead.')
+    return { data: [] }
+  },
+
+  /**
+   * Get threat history for a country (deprecated)
    */
   getThreatHistoryByCountry: async (country, timeRange = '24h') => {
-    try {
-      const response = await axios.get(`${API_BASE}/geo/threat-history/${country}`, {
-        params: { timeRange }
-      })
-      return response.data
-    } catch (error) {
-      console.error(`Error fetching threat history for ${country}:`, error)
-      throw error
-    }
+    console.warn('getThreatHistoryByCountry is deprecated. Use 2dMap.jsx instead.')
+    return { data: [] }
   },
 
   /**
-   * Get attack flow details
+   * Get attack flow details (deprecated)
    */
   getAttackFlowDetails: async (flowId) => {
-    try {
-      const response = await axios.get(`${API_BASE}/geo/attack-flow/${flowId}`)
-      return response.data
-    } catch (error) {
-      console.error(`Error fetching attack flow ${flowId}:`, error)
-      throw error
-    }
+    console.warn('getAttackFlowDetails is deprecated. Use 2dMap.jsx instead.')
+    return { data: {} }
   }
 }

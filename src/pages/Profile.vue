@@ -3,8 +3,8 @@
     <div class="max-w-6xl mx-auto">
       <!-- Header with Tabs -->
       <div class="mb-8">
-        <h1 class="text-3xl font-bold text-slate-dark-100 mb-2">User Profile</h1>
-        <p class="text-slate-dark-400 mb-6">Manage your profile information and preferences</p>
+        <h1 class="text-3xl font-black title-gradient tracking-tight">User Profile</h1>
+        <p class="text-slate-dark-400 mt-2 font-medium opacity-80">Manage your profile information and preferences</p>
         
         <!-- Navigation Tabs -->
         <div class="flex space-x-1 bg-slate-dark-800 p-1 rounded-lg">

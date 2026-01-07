@@ -1,20 +1,35 @@
 import axios from 'axios'
 import Case from '../models/Case.js'
 import logger from '../utils/logger.js'
+import cache from '../utils/cache.js'
+import metricsService from './metricsService.js'
+import eventBus from '../utils/eventBus.js'
 
-/**
- * CaseService - Hybrid data source service for case management
- * Implements fallback mechanism between TheHive API and MongoDB
- * Provides data normalization and error handling
- */
 class CaseService {
   constructor() {
-    this.cache = new Map()
-    this.cacheTimeout = 5 * 60 * 1000 // 5 minutes
+    this.cacheDuration = 60 * 1000 // 1 minute cache for case queries
+    this.cache = cache
     this.retryConfig = {
-      maxRetries: 3,
-      baseDelay: 1000,
-      maxDelay: 10000
+      maxRetries: parseInt(process.env.CASE_SYNC_MAX_RETRIES, 10) || 3,
+      baseDelay: parseInt(process.env.CASE_SYNC_RETRY_BASE, 10) || 1000,
+      maxDelay: parseInt(process.env.CASE_SYNC_RETRY_MAX, 10) || 8000
+    }
+    this.metrics = metricsService
+    this.validateHiveConfig()
+  }
+
+  validateHiveConfig() {
+    const { THEHIVE_BASE_URL, THEHIVE_CASES_PATH } = process.env
+    if (!THEHIVE_BASE_URL) {
+      logger.warn('CaseService: THEHIVE_BASE_URL not configured; remote sync disabled')
+      return
+    }
+
+    if (THEHIVE_CASES_PATH && !THEHIVE_CASES_PATH.startsWith('/')) {
+      logger.warn('CaseService: THEHIVE_CASES_PATH should start with "/"; normalizing automatically', {
+        path: THEHIVE_CASES_PATH
+      })
+      process.env.THEHIVE_CASES_PATH = `/${THEHIVE_CASES_PATH}`
     }
   }
 
@@ -25,21 +40,19 @@ class CaseService {
    */
   async getRecentCases(limit = 20) {
     const cacheKey = `recent_cases_${limit}`
-    
-    try {
-      // Check cache first
-      const cached = this.getCachedResponse(cacheKey)
-      if (cached) {
-        logger.info('CaseService: Returning cached cases', { source: 'cache', count: cached.length })
-        return cached
-      }
+    const cached = this.cache.get(cacheKey)
+    if (cached) {
+      logger.info('CaseService: Returning cached cases', { source: 'cache', count: cached.length })
+      return cached
+    }
 
+    try {
       // Try TheHive API first
       try {
         const hiveData = await this.fetchFromTheHive(limit)
         if (hiveData && hiveData.length > 0) {
           const normalizedCases = hiveData.map(rawCase => this.normalizeCase(rawCase, 'TheHive'))
-          this.setCachedResponse(cacheKey, normalizedCases)
+          this.cache.set(cacheKey, normalizedCases, this.cacheDuration)
           logger.info('CaseService: Retrieved cases from TheHive', { count: normalizedCases.length })
           return normalizedCases
         }
@@ -56,7 +69,7 @@ class CaseService {
       const normalizedCases = mongoData.map(rawCase => this.normalizeCase(rawCase, 'MongoDB'))
       
       if (normalizedCases.length > 0) {
-        this.setCachedResponse(cacheKey, normalizedCases)
+        this.cache.set(cacheKey, normalizedCases, this.cacheDuration)
         logger.info('CaseService: Retrieved cases from MongoDB fallback', { count: normalizedCases.length })
       }
       
@@ -66,140 +79,13 @@ class CaseService {
       logger.error('CaseService: All data sources failed', { error: error.message })
       
       // Try to return cached data as last resort
-      const cached = this.getCachedResponse(cacheKey, true) // ignore timeout
+      const cached = this.cache.get(cacheKey)
       if (cached) {
         logger.info('CaseService: Returning stale cached data due to all sources failing')
         return cached
       }
       
       throw new Error('All data sources unavailable and no cached data available')
-    }
-  }
-
-  /**
-   * Get a specific case by ID
-   * @param {string} id - Case ID
-   * @returns {Promise<Object|null>} Normalized case object or null
-   */
-  async getCaseById(id) {
-    try {
-      // Try TheHive first
-      try {
-        const hiveCase = await this.fetchCaseFromTheHive(id)
-        if (hiveCase) {
-          return this.normalizeCase(hiveCase, 'TheHive')
-        }
-      } catch (hiveError) {
-        logger.warn('CaseService: TheHive case fetch failed, trying MongoDB', { 
-          id, 
-          error: hiveError.message 
-        })
-      }
-
-      // Fallback to MongoDB
-      const mongoCase = await Case.findById(id).lean()
-      if (mongoCase) {
-        return this.normalizeCase(mongoCase, 'MongoDB')
-      }
-
-      return null
-    } catch (error) {
-      logger.error('CaseService: Failed to get case by ID', { id, error: error.message })
-      throw error
-    }
-  }
-
-  /**
-   * Create a new case
-   * @param {Object} caseData - Case data to create
-   * @returns {Promise<Object>} Created and normalized case object
-   */
-  async createCase(caseData) {
-    try {
-      // Always create in MongoDB first
-      const mongoCase = new Case({
-        ...caseData,
-        source: 'MongoDB',
-        created_by: caseData.created_by || 'system'
-      })
-      
-      await mongoCase.save()
-      logger.info('CaseService: Case created in MongoDB', { id: mongoCase._id })
-
-      // Try to sync to TheHive if available
-      try {
-        const hiveCase = await this.createCaseInTheHive(caseData)
-        if (hiveCase && hiveCase.id) {
-          // Update MongoDB case with TheHive ID
-          mongoCase.thehive_id = hiveCase.id
-          mongoCase.source = 'TheHive'
-          await mongoCase.save()
-          logger.info('CaseService: Case synced to TheHive', { 
-            mongoId: mongoCase._id, 
-            hiveId: hiveCase.id 
-          })
-        }
-      } catch (hiveError) {
-        logger.warn('CaseService: Failed to sync case to TheHive', { 
-          id: mongoCase._id, 
-          error: hiveError.message 
-        })
-      }
-
-      // Clear cache to ensure fresh data
-      this.clearCache()
-      
-      return this.normalizeCase(mongoCase.toObject(), mongoCase.source)
-    } catch (error) {
-      logger.error('CaseService: Failed to create case', { error: error.message })
-      throw error
-    }
-  }
-
-  /**
-   * Update an existing case
-   * @param {string} id - Case ID
-   * @param {Object} updates - Updates to apply
-   * @returns {Promise<Object>} Updated and normalized case object
-   */
-  async updateCase(id, updates) {
-    try {
-      // Update in MongoDB
-      const mongoCase = await Case.findByIdAndUpdate(
-        id, 
-        { ...updates, updated_at: new Date() }, 
-        { new: true }
-      )
-
-      if (!mongoCase) {
-        throw new Error(`Case not found: ${id}`)
-      }
-
-      logger.info('CaseService: Case updated in MongoDB', { id })
-
-      // Try to sync to TheHive if it has a TheHive ID
-      if (mongoCase.thehive_id) {
-        try {
-          await this.updateCaseInTheHive(mongoCase.thehive_id, updates)
-          logger.info('CaseService: Case updated in TheHive', { 
-            mongoId: id, 
-            hiveId: mongoCase.thehive_id 
-          })
-        } catch (hiveError) {
-          logger.warn('CaseService: Failed to sync case update to TheHive', { 
-            id, 
-            error: hiveError.message 
-          })
-        }
-      }
-
-      // Clear cache to ensure fresh data
-      this.clearCache()
-      
-      return this.normalizeCase(mongoCase.toObject(), mongoCase.source)
-    } catch (error) {
-      logger.error('CaseService: Failed to update case', { id, error: error.message })
-      throw error
     }
   }
 
@@ -218,108 +104,11 @@ class CaseService {
     const path = process.env.THEHIVE_CASES_PATH || '/api/v1/case'
     const params = { sort: '-createdAt', range: `0-${limit - 1}` }
 
-    const response = await this.retryRequest(() => 
+    const response = await this.retryRequest(() =>
       client.get(path, { params })
     )
 
     return Array.isArray(response.data) ? response.data : []
-  }
-
-  /**
-   * Fetch cases from MongoDB
-   * @private
-   * @param {number} limit - Maximum number of cases to retrieve
-   * @returns {Promise<Array>} Raw MongoDB case data
-   */
-  async fetchFromMongoDB(limit) {
-    try {
-      const cases = await Case.find()
-        .sort({ created_at: -1 })
-        .limit(limit)
-        .lean()
-      
-      return cases || []
-    } catch (error) {
-      logger.error('CaseService: MongoDB query failed', { error: error.message })
-      throw error
-    }
-  }
-
-  /**
-   * Fetch a specific case from TheHive
-   * @private
-   * @param {string} id - Case ID
-   * @returns {Promise<Object|null>} Raw TheHive case data
-   */
-  async fetchCaseFromTheHive(id) {
-    const client = this.getTheHiveClient()
-    if (!client) {
-      throw new Error('TheHive client not configured')
-    }
-
-    const path = `${process.env.THEHIVE_CASES_PATH || '/api/v1/case'}/${id}`
-    
-    try {
-      const response = await this.retryRequest(() => client.get(path))
-      return response.data
-    } catch (error) {
-      if (error.response && error.response.status === 404) {
-        return null
-      }
-      throw error
-    }
-  }
-
-  /**
-   * Create a case in TheHive
-   * @private
-   * @param {Object} caseData - Case data
-   * @returns {Promise<Object>} Created TheHive case
-   */
-  async createCaseInTheHive(caseData) {
-    const client = this.getTheHiveClient()
-    if (!client) {
-      throw new Error('TheHive client not configured')
-    }
-
-    const path = process.env.THEHIVE_CASES_PATH || '/api/v1/case'
-    const payload = {
-      title: caseData.title,
-      description: caseData.description,
-      severity: caseData.severity || 1,
-      tags: caseData.tags || [],
-      customFields: {
-        source: 'SOC Dashboard'
-      }
-    }
-
-    const response = await this.retryRequest(() => 
-      client.post(path, payload)
-    )
-
-    return response.data
-  }
-
-  /**
-   * Update a case in TheHive
-   * @private
-   * @param {string} hiveId - TheHive case ID
-   * @param {Object} updates - Updates to apply
-   * @returns {Promise<Object>} Updated TheHive case
-   */
-  async updateCaseInTheHive(hiveId, updates) {
-    const client = this.getTheHiveClient()
-    if (!client) {
-      throw new Error('TheHive client not configured')
-    }
-
-    const path = `${process.env.THEHIVE_CASES_PATH || '/api/v1/case'}/${hiveId}`
-    
-    const response = await this.retryRequest(() => 
-      client.patch(path, updates)
-    )
-
-    return response.data
   }
 
   /**
@@ -340,8 +129,8 @@ class CaseService {
       source: source,
       tags: Array.isArray(rawCase.tags) ? rawCase.tags : [],
       artifacts: Array.isArray(rawCase.artifacts) ? rawCase.artifacts : [],
-      createdAt: this.normalizeTimestamp(rawCase.createdAt || rawCase._createdAt || rawCase.created_at),
-      updatedAt: this.normalizeTimestamp(rawCase.updatedAt || rawCase._updatedAt || rawCase.updated_at),
+      createdAt: this.normalizeTimestamp(rawCase.createdAt || rawCase._createdAt || rawCase.created_at, 'createdAt', rawCase.id || rawCase._id),
+      updatedAt: this.normalizeTimestamp(rawCase.updatedAt || rawCase._updatedAt || rawCase.updated_at, 'updatedAt', rawCase.id || rawCase._id),
       created_by: rawCase.created_by || rawCase.createdBy || 'system'
     }
 
@@ -359,69 +148,33 @@ class CaseService {
   }
 
   /**
-   * Normalize severity values across sources
-   * @private
-   * @param {*} severity - Raw severity value
-   * @returns {number} Normalized severity (1-4)
-   */
-  normalizeSeverity(severity) {
-    if (typeof severity === 'number') {
-      return Math.max(1, Math.min(4, severity))
-    }
-    
-    if (typeof severity === 'string') {
-      switch (severity.toLowerCase()) {
-        case 'critical': return 4
-        case 'high': return 3
-        case 'medium': return 2
-        case 'low': return 1
-        default: return 1
-      }
-    }
-    
-    return 1
-  }
-
-  /**
-   * Normalize status values across sources
-   * @private
-   * @param {*} status - Raw status value
-   * @returns {string} Normalized status
-   */
-  normalizeStatus(status) {
-    if (!status) return 'Open'
-    
-    const statusStr = status.toString().toLowerCase()
-    const statusMap = {
-      'open': 'Open',
-      'new': 'Open',
-      'inprogress': 'InProgress',
-      'in-progress': 'InProgress',
-      'in_progress': 'InProgress',
-      'resolved': 'Resolved',
-      'closed': 'Closed',
-      'complete': 'Closed',
-      'completed': 'Closed'
-    }
-    
-    return statusMap[statusStr] || 'Open'
-  }
-
-  /**
    * Normalize timestamp values across sources
    * @private
    * @param {*} timestamp - Raw timestamp value
+   * @param {string} field - Field name (createdAt or updatedAt)
+   * @param {string} id - Case ID
    * @returns {Date} Normalized Date object
    */
-  normalizeTimestamp(timestamp) {
+  normalizeTimestamp(timestamp, field, id) {
     if (!timestamp) return new Date()
-    
-    if (timestamp instanceof Date) return timestamp
-    
-    if (typeof timestamp === 'number') return new Date(timestamp)
-    
-    if (typeof timestamp === 'string') return new Date(timestamp)
-    
+
+    if (timestamp instanceof Date) {
+      return new Date(timestamp.getTime())
+    }
+
+    if (typeof timestamp === 'number') {
+      return new Date(timestamp)
+    }
+
+    if (typeof timestamp === 'string') {
+      // Avoid double offsets; assume timestamps without timezone are UTC
+      if (timestamp.includes('T') && !timestamp.includes('Z') && !/[+-]\d{2}:?\d{2}$/.test(timestamp)) {
+        return new Date(`${timestamp}Z`)
+      }
+      return new Date(timestamp)
+    }
+
+    logger.warn(`CaseService: Invalid ${field} timestamp for case ${id}`, { timestamp: timestamp.toString() })
     return new Date()
   }
 
@@ -457,37 +210,37 @@ class CaseService {
    */
   async retryRequest(requestFn) {
     let lastError
-    
+
     for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
       try {
         return await requestFn()
       } catch (error) {
         lastError = error
-        
+
         if (attempt === this.retryConfig.maxRetries) {
           break
         }
-        
+
         // Don't retry on 4xx errors (except 429)
         if (error.response && error.response.status >= 400 && error.response.status < 500 && error.response.status !== 429) {
           break
         }
-        
-        const delay = Math.min(
-          this.retryConfig.baseDelay * Math.pow(2, attempt),
-          this.retryConfig.maxDelay
-        )
-        
-        logger.warn(`CaseService: Request failed, retrying in ${delay}ms`, { 
-          attempt: attempt + 1, 
+
+        const backoff = this.retryConfig.baseDelay * Math.pow(2, attempt)
+        const jitter = Math.random() * 250
+        const delay = Math.min(backoff + jitter, this.retryConfig.maxDelay)
+
+        logger.warn(`CaseService: Request failed, retrying in ${Math.round(delay)}ms`, {
+          attempt: attempt + 1,
           maxRetries: this.retryConfig.maxRetries,
-          error: error.message 
+          status: error.response?.status,
+          error: error.message
         })
-        
+
         await new Promise(resolve => setTimeout(resolve, delay))
       }
     }
-    
+
     throw lastError
   }
 

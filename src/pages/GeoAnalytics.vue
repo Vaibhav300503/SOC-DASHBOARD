@@ -26,27 +26,34 @@
         </div>
       </div>
 
-    <!-- Live Threat Map with Real-time Attack Flows -->
-    <LiveThreatMap :key="timeRange" />
+    <!-- 2D Map with Attack Flows -->
+    <div class="bg-slate-800/50 rounded-lg p-4 border border-slate-700/30">
+      <h3 class="text-lg font-semibold text-slate-200 mb-4">Global Attack Flow Map</h3>
+      <iframe 
+        src="http://localhost:3001" 
+        class="w-full h-[600px] rounded-lg border-0"
+        title="Attack Flow Map"
+      ></iframe>
+    </div>
 
     
 
     <!-- Geo Statistics -->
     <div class="my-8">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
-        <div class="stat-card card-accent-cyan">
+        <div class="stat-card card-accent-cyan text-center-left">
           <div class="stat-value text-accent-primary">{{ uniqueCountries }}</div>
           <div class="stat-label">Countries</div>
         </div>
-        <div class="stat-card card-accent-purple">
+        <div class="stat-card card-accent-purple text-center-left">
           <div class="stat-value text-accent-secondary">{{ uniqueCities }}</div>
           <div class="stat-label">Cities</div>
         </div>
-        <div class="stat-card card-accent-cyan">
+        <div class="stat-card card-accent-cyan text-center-left">
           <div class="stat-value text-accent-primary">{{ totalGeoEvents }}</div>
           <div class="stat-label">Total Events</div>
         </div>
-        <div class="stat-card card-accent-green">
+        <div class="stat-card card-accent-green text-center-left">
           <div class="stat-value text-neon-green">{{ avgEventsPerLocation }}</div>
           <div class="stat-label">Avg Events/City</div>
         </div>
@@ -161,7 +168,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useAPIStore } from '../stores/apiStore'
-import LiveThreatMap from '../components/soc/LiveThreatMap.vue'
 
 const apiStore = useAPIStore()
 const timeRange = ref('24h')

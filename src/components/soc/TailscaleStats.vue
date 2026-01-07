@@ -141,6 +141,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useAPIStore } from '../../stores/apiStore'
 import { useTailscaleWebSocket } from '../../services/tailscaleWebSocket'
+import { formatTimestamp } from '../../utils/timestampFormatter.js'
 
 const apiStore = useAPIStore()
 const { connect, disconnect, subscribe } = useTailscaleWebSocket()
@@ -263,7 +264,7 @@ const formatLastSync = (timestamp) => {
 
 const formatTime = (timestamp) => {
   if (!timestamp) return 'Unknown'
-  return new Date(timestamp).toLocaleTimeString()
+  return formatTimestamp(timestamp, 'time')
 }
 
 onMounted(() => {

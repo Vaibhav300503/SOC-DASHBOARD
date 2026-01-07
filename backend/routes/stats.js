@@ -55,16 +55,8 @@ router.get('/dashboard', async (req, res) => {
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          // Assign severity based on log source since all DB severities are null
-          assignedSeverity: {
-            $switch: {
-              branches: [
-                { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /security|intrusion|malware|Security/i } }, then: 'High' },
-                { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /error|fail|critical|kernel/i } }, then: 'Medium' }
-              ],
-              default: 'Low'
-            }
-          }
+          // Assign severity based on stored field
+          assignedSeverity: { $ifNull: ['$severity', 'Low'] }
         }
       }
     ]
@@ -96,12 +88,12 @@ router.get('/dashboard', async (req, res) => {
 
     // Merge and normalize severity breakdowns from both logs and cases
     const severityMap = new Map()
-    
+
     logSeverityBreakdown.forEach(item => {
       const normalized = normalizeSeverity(item._id)
       severityMap.set(normalized, (severityMap.get(normalized) || 0) + item.count)
     })
-    
+
     caseSeverityBreakdown.forEach(item => {
       const normalized = normalizeSeverity(item._id)
       severityMap.set(normalized, (severityMap.get(normalized) || 0) + item.count)
@@ -260,7 +252,7 @@ router.get('/dashboard', async (req, res) => {
       .slice(0, 10)
 
     // Get unique hosts from events or agents
-    const uniqueHostsFromEvents = timeRange === 'all' 
+    const uniqueHostsFromEvents = timeRange === 'all'
       ? await Event.distinct('host.name')
       : await Event.distinct('host.name', { '@timestamp': { $gte: since } })
     const agentsCount = await Agent.countDocuments({ status: 'active' })
@@ -354,16 +346,8 @@ router.get('/severity', async (req, res) => {
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          // Assign severity based on log source since all DB severities are null
-          assignedSeverity: {
-            $switch: {
-              branches: [
-                { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /security|intrusion|malware|Security/i } }, then: 'High' },
-                { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /error|fail|critical|kernel/i } }, then: 'Medium' }
-              ],
-              default: 'Low'
-            }
-          }
+          // Assign severity based on stored field
+          assignedSeverity: { $ifNull: ['$severity', 'Low'] }
         }
       }
     ]
@@ -408,16 +392,8 @@ router.get('/timeline', async (req, res) => {
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          // Assign severity based on log source since all DB severities are null
-          assignedSeverity: {
-            $switch: {
-              branches: [
-                { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /security|intrusion|malware|Security/i } }, then: 'High' },
-                { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /error|fail|critical|kernel/i } }, then: 'Medium' }
-              ],
-              default: 'Low'
-            }
-          }
+          // Assign severity based on stored field
+          assignedSeverity: { $ifNull: ['$severity', 'Low'] }
         }
       }
     ]

@@ -1,25 +1,25 @@
 <template>
-  <div class="card-glass p-7 rounded-xl h-full">
+  <div class="card-glass p-7 h-full">
     <div class="flex items-center justify-between mb-5">
-      <h3 class="text-lg font-semibold text-slate-50">{{ title }}</h3>
-      <span class="px-2.5 py-1 bg-cyan-500/10 text-cyan-400 text-[10px] font-medium rounded-md border border-cyan-500/20 uppercase tracking-wider">TOP ACTIVITIES</span>
+      <h3 class="text-lg font-semibold text-[var(--text-primary-headings)]">{{ title }}</h3>
+      <span class="px-2.5 py-1 bg-blue-500/10 text-blue-400 text-[10px] font-medium rounded-md border border-blue-500/20 uppercase tracking-wider">TOP ACTIVITIES</span>
     </div>
-    <div class="bg-slate-800/20 rounded-lg border border-slate-700/40 overflow-hidden">
+    <div class="bg-[var(--bg-card-secondary)] rounded-lg border border-[var(--border-card-default)] overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-xs">
           <thead>
-            <tr class="border-b border-slate-700/50 bg-slate-800/30">
-              <th class="w-1/2 text-left py-3 px-4 text-slate-400 font-medium uppercase tracking-wider">IP Address</th>
-              <th class="w-1/4 text-right py-3 px-4 text-slate-400 font-medium uppercase tracking-wider">Events</th>
-              <th class="w-1/4 text-right py-3 px-4 text-slate-400 font-medium uppercase tracking-wider">Severity</th>
+            <tr class="border-b border-[var(--border-card-default)] bg-[var(--bg-card-inner)]">
+              <th class="w-1/2 text-left py-3 px-4 text-[var(--text-secondary)] font-medium uppercase tracking-wider">IP Address</th>
+              <th class="w-1/4 text-right py-3 px-4 text-[var(--text-secondary)] font-medium uppercase tracking-wider">Events</th>
+              <th class="w-1/4 text-right py-3 px-4 text-[var(--text-secondary)] font-medium uppercase tracking-wider">Severity</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(row, idx) in normalizedData" :key="idx" class="border-b border-slate-700/30 hover:bg-slate-800/40 transition-colors">
+            <tr v-for="(row, idx) in normalizedData" :key="idx" class="border-b border-[var(--border-card-default)] hover:bg-[var(--hover-overlay)] transition-colors">
               <td class="py-3 px-4">
-                <code class="text-cyan-400 font-mono text-xs">{{ row.ip }}</code>
+                <code class="text-blue-400 font-mono text-xs">{{ row.ip }}</code>
               </td>
-              <td class="text-right py-3 px-4 text-slate-300 font-semibold">
+              <td class="text-right py-3 px-4 text-[var(--text-primary)] font-semibold">
                 {{ row.count }}
               </td>
               <td class="text-right py-3 px-4">
@@ -39,8 +39,8 @@
           </tbody>
         </table>
       </div>
-      <div v-if="normalizedData.length === 0" class="text-center py-12 text-slate-500">
-        <i class="fas fa-shield-alt text-4xl mb-3 block text-slate-600"></i>
+      <div v-if="normalizedData.length === 0" class="text-center py-12 text-[var(--text-muted)]">
+        <i class="fas fa-shield-alt text-4xl mb-3 block text-[var(--text-disabled)]"></i>
         <p class="text-sm">No IP data available</p>
       </div>
     </div>

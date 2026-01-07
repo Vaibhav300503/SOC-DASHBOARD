@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Backend for SOC Dashboard - Log ingestion and API",
   "main": "server.js",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
     "start": "node -r dotenv/config server.js",
     "dev": "nodemon -r dotenv/config server.js",

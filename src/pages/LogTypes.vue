@@ -86,23 +86,23 @@
 
     <!-- Statistics -->
     <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-      <div class="stat-card card-accent-cyan">
+      <div class="stat-card card-accent-cyan text-center-left">
         <div class="stat-value text-accent-primary">{{ totalFilteredCount }}</div>
         <div class="stat-label">{{ selectedLogType }} Logs</div>
       </div>
-      <div class="stat-card card-accent-red">
+      <div class="stat-card card-accent-red text-center-left">
         <div class="stat-value text-neon-red">{{ criticalCount }}</div>
         <div class="stat-label">Critical</div>
       </div>
-      <div class="stat-card card-accent-orange">
+      <div class="stat-card card-accent-orange text-center-left">
         <div class="stat-value text-neon-orange">{{ highCount }}</div>
         <div class="stat-label">High</div>
       </div>
-      <div class="stat-card card-accent-yellow">
+      <div class="stat-card card-accent-yellow text-center-left">
         <div class="stat-value text-neon-yellow">{{ mediumCount }}</div>
         <div class="stat-label">Medium</div>
       </div>
-      <div class="stat-card card-accent-green">
+      <div class="stat-card card-accent-green text-center-left">
         <div class="stat-value text-neon-green">{{ lowCount }}</div>
         <div class="stat-label">Low</div>
       </div>
@@ -204,7 +204,7 @@
                 </div>
               </td>
             </tr>
-            <tr v-else v-for="log in filteredLogs.slice(0, displayLimit)" :key="log.id">
+            <tr v-else v-for="log in logs" :key="log.id">
               <td class="text-slate-dark-400 text-sm">{{ formatTime(log.timestamp) }}</td>
               <td>
                 <code class="text-cyber-400 font-mono text-sm">{{ log.computer || log.source_ip }}</code>
@@ -260,16 +260,17 @@
 
       <div class="mt-4 flex items-center justify-between">
         <div class="text-sm text-slate-dark-400">
-          Showing {{ Math.min(displayLimit, filteredLogs.length) }} of {{ filteredLogs.length }} logs
+          Showing {{ logs.length }} logs
         </div>
         <button 
-          v-if="displayLimit < filteredLogs.length"
-          @click="displayLimit += 20"
-          class="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/50 text-cyan-400 hover:border-cyan-400 hover:shadow-lg hover:shadow-cyan-500/30 transition-all duration-300 text-sm font-medium group relative overflow-hidden"
+          v-if="hasMore"
+          @click="loadMore"
+          :disabled="isLoading"
+          class="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/50 text-cyan-400 hover:border-cyan-400 hover:shadow-lg hover:shadow-cyan-500/30 transition-all duration-300 text-sm font-medium group relative overflow-hidden disabled:opacity-50"
         >
           <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           <i class="fas fa-chevron-down mr-2"></i>
-          <span class="relative">Load More</span>
+          <span class="relative">{{ isLoading ? 'Loading...' : 'Load More' }}</span>
         </button>
       </div>
     </div>
@@ -572,6 +573,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useLogStore } from '../stores/logStore'
 import { useAPIStore } from '../stores/apiStore'
 import { useToast } from '../composables/useToast'
+import { formatTimestamp } from '../utils/timestampFormatter.js'
 import { normalizeSeverity, getSeverityClass, getSeverityLabel } from '../utils/severityNormalization'
 import { STANDARD_LOG_TYPES, getDisplayName } from '../utils/logTypeConstants'
 import { logsAPI } from '../api/logs'
@@ -590,178 +592,30 @@ const selectedLog = ref(null)
 const isLoading = ref(false)
 const displayLimit = ref(20)
 
+// Pagination state
+const currentPage = ref(1)
+const hasMore = ref(true)
+const logs = ref([])
+
 onMounted(async () => {
   console.log('LogTypes component mounted')
-  
-  // Fetch logs from backend
-  await apiStore.fetchRecentLogs()
-  console.log('Logs fetched:', {
-    totalLogs: (apiStore.logs || []).length,
-    sampleLogTypes: (apiStore.logs || []).slice(0, 5).map(l => l.log_type)
-  })
-  
-  // Fetch dashboard stats
+  await fetchLogs(true)
   await apiStore.fetchDashboardStats()
-  
-  console.log('Using standardized log types:', logTypes.value)
 })
 
 // Watch for filter changes and apply them
-watch([selectedLogType, filterSeverity, filterTimeRange, filterAction, filterSourceIP], (newValues, oldValues) => {
-  console.log('Filter changed:', { 
-    selectedLogType: newValues[0], 
-    filterSeverity: newValues[1], 
-    filterTimeRange: newValues[2], 
-    filterAction: newValues[3], 
-    filterSourceIP: newValues[4] 
-  })
-  
-  // Log sample of available logs for debugging
-  const sampleLogs = (apiStore.logs || []).slice(0, 3)
-  console.log('Sample logs for debugging:', sampleLogs.map(log => ({
-    log_type: log.log_type,
-    severity: log.severity,
-    source_ip: log.source_ip,
-    timestamp: log.timestamp
-  })))
-  
-  // Reset display limit when filters change
-  displayLimit.value = 20
+watch([selectedLogType, filterSeverity, filterTimeRange, filterAction, filterSourceIP], () => {
+  // Reset pagination on filter change
+  fetchLogs(true)
 })
 
-const logsOfSelectedType = computed(() => {
-  let logs = []
-  
-  if (selectedLogType.value === 'All') {
-    // Use the fetched logs from apiStore
-    logs = apiStore.logs || []
-  } else {
-    // Convert display name back to internal log type for filtering
-    const internalLogType = STANDARD_LOG_TYPES.find(type => getDisplayName(type) === selectedLogType.value) || selectedLogType.value
-    
-    // Filter logs by exact log type match
-    logs = (apiStore.logs || []).filter(log => {
-      const logType = log.log_type || 'system'
-      return logType === internalLogType
-    })
+const fetchLogs = async (reset = false) => {
+  if (reset) {
+    currentPage.value = 1
+    logs.value = []
+    hasMore.value = true
   }
   
-  console.log('Logs of selected type:', { 
-    selectedType: selectedLogType.value, 
-    totalLogs: (apiStore.logs || []).length,
-    filteredLogs: logs.length,
-    sampleLogTypes: logs.slice(0, 5).map(l => l.log_type),
-    uniqueLogTypes: [...new Set((apiStore.logs || []).map(l => l.log_type))]
-  })
-  
-  return logs
-})
-
-const filteredLogs = computed(() => {
-  let logs = logsOfSelectedType.value
-  console.log('Filtering logs:', { 
-    totalLogs: logs.length, 
-    filterSeverity: filterSeverity.value,
-    selectedLogType: selectedLogType.value 
-  })
-  
-  // Apply severity filter
-  if (filterSeverity.value) {
-    logs = logs.filter(log => {
-      const normalizedSeverity = normalizeSeverity(log.severity)
-      return normalizedSeverity === filterSeverity.value
-    })
-    console.log('After severity filter:', logs.length)
-  }
-  
-  // Apply action filter
-  if (filterAction.value) {
-    logs = logs.filter(log => {
-      const action = log.raw?.action || log.raw_data?.action || log.action
-      return action === filterAction.value
-    })
-  }
-  
-  // Apply source IP filter
-  if (filterSourceIP.value) {
-    logs = logs.filter(log => {
-      const sourceIP = log.source_ip || log.ip_address
-      return sourceIP && sourceIP.toLowerCase().includes(filterSourceIP.value.toLowerCase())
-    })
-  }
-  
-  return logs
-})
-
-const criticalCount = computed(() => {
-  // Count critical logs from currently filtered logs (by log type)
-  return logsOfSelectedType.value.filter(log => {
-    const normalizedSeverity = normalizeSeverity(log.severity)
-    return normalizedSeverity === 'Critical'
-  }).length
-})
-
-const highCount = computed(() => {
-  // Count high logs from currently filtered logs (by log type)
-  return logsOfSelectedType.value.filter(log => {
-    const normalizedSeverity = normalizeSeverity(log.severity)
-    return normalizedSeverity === 'High'
-  }).length
-})
-
-const mediumCount = computed(() => {
-  // Count medium logs from currently filtered logs (by log type)
-  return logsOfSelectedType.value.filter(log => {
-    const normalizedSeverity = normalizeSeverity(log.severity)
-    return normalizedSeverity === 'Medium'
-  }).length
-})
-
-const lowCount = computed(() => {
-  // Count low logs from currently filtered logs (by log type)
-  return logsOfSelectedType.value.filter(log => {
-    const normalizedSeverity = normalizeSeverity(log.severity)
-    return normalizedSeverity === 'Low'
-  }).length
-})
-
-const totalFilteredCount = computed(() => {
-  // Total count of logs for selected log type
-  return logsOfSelectedType.value.length
-})
-
-const severityDistribution = computed(() => [
-  { name: 'Critical', value: criticalCount.value, color: '#ff0055' },
-  { name: 'High', value: highCount.value, color: '#ff6b35' },
-  { name: 'Medium', value: mediumCount.value, color: '#ffd700' },
-  { name: 'Low', value: lowCount.value, color: '#00ff88' },
-])
-
-const formatTime = (timestamp) => {
-  return new Date(timestamp).toLocaleString()
-}
-
-const formatFullTime = (timestamp) => {
-  return new Date(timestamp).toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  })
-}
-
-// Log details modal functions
-const showLogDetails = (log) => {
-  selectedLog.value = log
-}
-
-const closeLogDetails = () => {
-  selectedLog.value = null
-}
-
-const handleLogTypesSearch = async () => {
   isLoading.value = true
   try {
     // Convert display name back to internal log type if needed
@@ -770,26 +624,35 @@ const handleLogTypesSearch = async () => {
       internalLogType = STANDARD_LOG_TYPES.find(type => getDisplayName(type) === selectedLogType.value) || selectedLogType.value
     }
     
-    // Use the logsAPI to fetch filtered logs
-    const response = await logsAPI.getRecent(1000, filterSeverity.value, internalLogType)
+    // Use the getAll endpoint which supports proper pagination
+    const response = await logsAPI.getAll({
+       limit: 50,
+       page: currentPage.value,
+       logType: internalLogType,
+       severity: filterSeverity.value || null,
+       timeRange: filterTimeRange.value,
+       action: filterAction.value || null,
+       sourceIp: filterSourceIP.value || null // Note: Source IP filtering might need backend support in GET / if not already present
+    })
     
     if (response && response.data) {
-      // Update the apiStore with filtered results
-      apiStore.logs = response.data
-      console.log('Filtered logs fetched:', {
-        total: response.total,
-        returned: response.data.length,
-        filters: {
-          logType: selectedLogType.value,
-          severity: filterSeverity.value,
-          timeRange: filterTimeRange.value
-        }
-      })
+      if (reset) {
+        logs.value = response.data
+      } else {
+        logs.value = [...logs.value, ...response.data]
+      }
       
-      addToast({
-        type: 'success',
-        message: `Found ${response.data.length} logs matching your filters`
-      })
+      // Update store for compatibility (though we maintain local state now)
+      apiStore.logs = logs.value
+      
+      hasMore.value = response.hasMore || (logs.value.length < response.total)
+      
+      if (reset) {
+         addToast({
+          type: 'success',
+          message: `Found ${response.total} logs matching your filters`
+        })
+      }
     }
   } catch (error) {
     console.error('Error fetching filtered logs:', error)
@@ -800,6 +663,55 @@ const handleLogTypesSearch = async () => {
   } finally {
     isLoading.value = false
   }
+}
+
+const handleLogTypesSearch = () => {
+  fetchLogs(true)
+}
+
+const loadMore = () => {
+  if (!isLoading.value && hasMore.value) {
+    currentPage.value++
+    fetchLogs(false)
+  }
+}
+
+// Update filteredLogs computed to just return our local server-fetched logs
+// We no longer filter locally for the main list
+const filteredLogs = computed(() => logs.value)
+
+// Counts need to be updated to rely on Dashboard stats or separate API call 
+// because we don't have all logs client-side anymore.
+// For now, we can only count what is visible, OR we should hide these counts if they are not accurate.
+// BETTER: Use the dashboard stats we fetched which contains severity breakdown.
+const criticalCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'Critical')?.count || 0)
+const highCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'High')?.count || 0)
+const mediumCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'Medium')?.count || 0)
+const lowCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'Low')?.count || 0)
+const totalFilteredCount = computed(() => apiStore.totalLogs)
+
+
+const severityDistribution = computed(() => [
+  { name: 'Critical', value: criticalCount.value, color: '#ff0055' },
+  { name: 'High', value: highCount.value, color: '#ff6b35' },
+  { name: 'Medium', value: mediumCount.value, color: '#ffd700' },
+  { name: 'Low', value: lowCount.value, color: '#00ff88' },
+])
+
+const formatTime = (timestamp) => {
+  return formatTimestamp(timestamp, 'datetime')
+}
+
+const formatFullTime = (timestamp) => {
+  return formatTimestamp(timestamp, 'datetime')
+}
+
+const showLogDetails = (log) => {
+  selectedLog.value = log
+}
+
+const closeLogDetails = () => {
+  selectedLog.value = null
 }
 
 const copyRawLog = async () => {

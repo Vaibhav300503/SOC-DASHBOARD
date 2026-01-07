@@ -1,14 +1,14 @@
-import express from 'express'
-import { createServer } from 'http'
-import cors from 'cors'
-import helmet from 'helmet'
-import dotenv from 'dotenv'
-import mongoose from 'mongoose'
-import rateLimit from 'express-rate-limit'
-import bodyParser from 'body-parser'
-import winston from 'winston'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import express from 'express';
+import { createServer } from 'http';
+import cors from 'cors';
+import helmet from 'helmet';
+import dotenv from 'dotenv';
+import mongoose from 'mongoose';
+import rateLimit from 'express-rate-limit';
+import bodyParser from 'body-parser';
+import winston from 'winston';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Load environment variables
 dotenv.config()
@@ -19,23 +19,23 @@ const server = createServer(app)
 const PORT = process.env.PORT || 3001
 
 // Import database connection
-import connectDB from './config/db.js'
+import connectDB from './config/db.js';
 
 // Import Tailscale sync service (protected version)
-import lockedSyncService from './services/tailscaleSyncLocked.js'
+import lockedSyncService from './services/tailscaleSyncLocked.js';
 
 // Import case sync service
-import { startCaseSync } from './services/caseSync.js'
+import { startCaseSync } from './services/caseSync.js';
 
 // Connect to MongoDB
 connectDB()
 
 // Start Tailscale auto-sync (only if API key is configured)
-if (process.env.TAILSCALE_API_KEY) {
-  lockedSyncService.startAutoSync();
-} else {
-  console.log('⚠️  TAILSCALE_API_KEY not found - Tailscale sync disabled');
-}
+// if (process.env.TAILSCALE_API_KEY) {
+//   lockedSyncService.startAutoSync();
+// } else {
+//   console.log('⚠️  TAILSCALE_API_KEY not found - Tailscale sync disabled');
+// }
 
 // Start TheHive case sync (only if configured)
 if (process.env.THEHIVE_BASE_URL && process.env.THEHIVE_API_KEY) {
@@ -212,16 +212,13 @@ app.get('/api/test/db', async (req, res) => {
 });
 
 // API Routes
-const API_PREFIX = '/api';
-
-// Handle preflight requests
-app.options('*', cors());
-
-// Apply rate limiting to all API routes
-app.use(API_PREFIX, (req, res, next) => {
+app.use('/api/', (req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+  console.log('Request headers:', req.headers);
   next();
-});
+}, limiter)
+
+// Define routes
 
 // Define routes
 const routes = [

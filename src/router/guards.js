@@ -6,6 +6,9 @@ import { useAuthStore } from '../stores/authStore'
 export const authGuard = async (to, from, next) => {
   const authStore = useAuthStore()
   
+  // Wait for auth store to initialize
+  await new Promise(resolve => setTimeout(resolve, 50))
+  
   // Check if user is authenticated
   if (authStore.isAuthenticated) {
     next()
@@ -14,15 +17,19 @@ export const authGuard = async (to, from, next) => {
   
   // If not authenticated, try to restore from localStorage
   const storedUser = localStorage.getItem('user')
-  if (storedUser) {
+  const storedToken = localStorage.getItem('token')
+  if (storedUser && storedToken) {
     try {
       const userData = JSON.parse(storedUser)
       authStore.user = userData
+      authStore.token = storedToken
+      console.log('Auth guard: Restored user from localStorage:', userData.email)
       next()
       return
     } catch (e) {
       console.error('Failed to parse stored user:', e)
       localStorage.removeItem('user')
+      localStorage.removeItem('token')
     }
   }
   
@@ -41,17 +48,20 @@ export const guestGuard = (to, from, next) => {
     return
   }
   
-  // Also check localStorage for stored user
+  // Also check localStorage for stored user and token
   const storedUser = localStorage.getItem('user')
-  if (storedUser) {
+  const storedToken = localStorage.getItem('token')
+  if (storedUser && storedToken) {
     try {
       const userData = JSON.parse(storedUser)
       authStore.user = userData
+      authStore.token = storedToken
       next('/dashboard')
       return
     } catch (e) {
       console.error('Failed to parse stored user:', e)
       localStorage.removeItem('user')
+      localStorage.removeItem('token')
     }
   }
 
@@ -65,17 +75,23 @@ export const roleGuard = (requiredRoles = []) => {
   return async (to, from, next) => {
     const authStore = useAuthStore()
     
+    // Wait for auth store to initialize
+    await new Promise(resolve => setTimeout(resolve, 50))
+    
     // First ensure we have an authenticated user
     if (!authStore.isAuthenticated) {
       // Try to restore from localStorage
       const storedUser = localStorage.getItem('user')
-      if (storedUser) {
+      const storedToken = localStorage.getItem('token')
+      if (storedUser && storedToken) {
         try {
           const userData = JSON.parse(storedUser)
           authStore.user = userData
+          authStore.token = storedToken
         } catch (e) {
           console.error('Failed to parse stored user:', e)
           localStorage.removeItem('user')
+          localStorage.removeItem('token')
           next('/login')
           return
         }

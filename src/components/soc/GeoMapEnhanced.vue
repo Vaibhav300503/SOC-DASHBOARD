@@ -19,11 +19,35 @@
             <i :class="showHeatmap ? 'fas fa-map-marker-alt' : 'fas fa-fire'" class="mr-1"></i>
             {{ showHeatmap ? 'Markers' : 'Heatmap' }}
           </button>
+          <button
+            @click="toggleFullscreen"
+            class="px-3 py-1 text-xs rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors"
+            :title="isFullscreen ? 'Exit fullscreen mode' : 'Enter fullscreen mode'"
+          >
+            <i :class="isFullscreen ? 'fas fa-compress' : 'fas fa-expand'" class="mr-1"></i>
+            {{ isFullscreen ? 'Exit Fullscreen' : 'Fullscreen' }}
+          </button>
         </div>
       </template>
 
       <!-- Map -->
-      <div ref="mapContainer" class="w-full h-96 rounded-lg border border-slate-700/30 overflow-hidden"></div>
+      <div class="relative">
+        <button
+          v-if="isFullscreen"
+          @click="exitFullscreen"
+          class="fixed top-6 right-6 z-[75] px-4 py-2 text-xs font-semibold rounded-md bg-slate-900/90 text-slate-200 border border-emerald-400/40 hover:bg-slate-800 transition-colors shadow-lg"
+        >
+          <i class="fas fa-compress mr-2"></i>
+          Exit Fullscreen
+        </button>
+        <div
+          ref="mapContainer"
+          :class="[
+            'w-full h-96 rounded-lg border border-slate-700/30 overflow-hidden transition-all duration-500 ease-out',
+            { 'fullscreen-map': isFullscreen }
+          ]"
+        ></div>
+      </div>
 
       <!-- Map Stats -->
       <template #footer>
@@ -95,7 +119,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
@@ -103,17 +127,28 @@ import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import 'leaflet.markercluster'
 import DashboardCard from '../common/DashboardCard.vue'
 import { useAPIStore } from '../../stores/apiStore'
+import {
+  getLocationFeatureCollection,
+  getAttackFlowCollection,
+  subscribeToLocationThread,
+  FLOW_TTL
+} from '../../utils/locationMapData'
 
 const apiStore = useAPIStore()
 const mapContainer = ref(null)
 let map = null
 let markerClusterGroup = null
 let flowsLayer = null
+let unsubscribeLocationThread = null
+let flowFadeInterval = null
 
 const features = ref([])
 const flows = ref([])
 const showHeatmap = ref(false)
 const timeRange = ref('24h')
+const isFullscreen = ref(false)
+
+const flowGraphics = new Map()
 
 const totalMarkers = computed(() => features.value.length)
 
@@ -140,7 +175,7 @@ function initMap() {
   map = L.map(mapContainer.value).setView([20.5937, 78.9629], 4)
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap contributors, © CartoDB',
+    attribution: ' OpenStreetMap contributors, CartoDB',
     maxZoom: 19,
     className: 'map-tiles'
   }).addTo(map)
@@ -151,14 +186,23 @@ function initMap() {
   })
 
   map.addLayer(markerClusterGroup)
+
+  if (!map.getPane('flows')) {
+    map.createPane('flows')
+    const pane = map.getPane('flows')
+    if (pane) {
+      pane.style.zIndex = '650'
+      pane.style.pointerEvents = 'none'
+    }
+  }
+  flowsLayer = L.layerGroup([], { pane: 'flows' }).addTo(map)
 }
 
 async function fetchAndDisplayGeoData() {
   try {
-    const response = await fetch(`/api/geo/logs?timeRange=${timeRange.value}&limit=1000`)
-    const data = await response.json()
+    const data = getLocationFeatureCollection()
 
-    if (data.success && data.features) {
+    if (data.success && Array.isArray(data.features)) {
       features.value = data.features
       updateMapMarkers()
     }
@@ -227,7 +271,16 @@ function getSeverityBadgeClass(severity) {
 function formatTime(timestamp) {
   if (!timestamp) return '—'
   const date = new Date(timestamp)
-  return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+    timeZone: 'UTC'
+  })
 }
 
 function resetMap() {
@@ -242,75 +295,201 @@ function toggleHeatmap() {
 
 async function fetchAttackFlows() {
   try {
-    const res = await fetch('/api/logs/recent?limit=200')
-    const json = await res.json()
-    const logs = Array.isArray(json.data) ? json.data : []
-
-    const ipSet = new Set()
-    logs.forEach(log => {
-      if (log.source_ip) ipSet.add(log.source_ip)
-      if (log.dest_ip) ipSet.add(log.dest_ip)
-    })
-
-    const ipList = Array.from(ipSet).slice(0, 60)
-    const geoMap = new Map()
-
-    await Promise.all(ipList.map(async ip => {
-      try {
-        const r = await fetch(`/api/geo/ip/${encodeURIComponent(ip)}`)
-        const j = await r.json()
-        if (j.success && j.data) {
-          const g = j.data
-          const lat = g.latitude ?? g.lat
-          const lon = g.longitude ?? g.lon
-          if (lat !== undefined && lon !== undefined) {
-            geoMap.set(ip, {
-              lat,
-              lon,
-              country: g.country || g.country_name || '',
-              city: g.city || g.city_name || ''
-            })
-          }
-        }
-      } catch (e) {
-        console.error('Error fetching geo for ip', ip, e)
-      }
-    }))
-
-    const list = []
-    logs.slice(0, 100).forEach(log => {
-      const src = geoMap.get(log.source_ip)
-      const dst = geoMap.get(log.dest_ip)
-      if (!src || !dst) return
-      const severity = log.severity || 'Low'
-      const color = getSeverityColor(severity)
-      list.push({
-        src,
-        dst,
-        severity,
-        color,
-        srcIp: log.source_ip,
-        dstIp: log.dest_ip,
-        logType: log.log_type,
-        timestamp: log.timestamp
-      })
-    })
-
-    flows.value = list
+    const list = getAttackFlowCollection()
+    flows.value = Array.isArray(list) ? list : []
+    renderAttackFlows()
   } catch (error) {
     console.error('Error building attack flows:', error)
   }
 }
+
+function ensureFlowsLayer() {
+  if (!map) return
+  if (!flowsLayer) {
+    flowsLayer = L.layerGroup([], { pane: 'flows' }).addTo(map)
+  }
+}
+
+function removeFlowGraphics(flowId) {
+  const elements = flowGraphics.get(flowId)
+  if (!elements || !flowsLayer) return
+  flowsLayer.removeLayer(elements.polyline)
+  flowsLayer.removeLayer(elements.sourceMarker)
+  flowsLayer.removeLayer(elements.destMarker)
+  flowGraphics.delete(flowId)
+}
+
+function createArcLatLngs(src, dst) {
+  if (!src || !dst) return []
+  const midLat = (src.lat + dst.lat) / 2 + ((dst.lon - src.lon) * 0.08)
+  const midLon = (src.lon + dst.lon) / 2 + ((src.lat - dst.lat) * 0.08)
+  return [
+    [src.lat, src.lon],
+    [midLat, midLon],
+    [dst.lat, dst.lon]
+  ]
+}
+
+function createFlowGraphics(flow) {
+  if (!map || !flow) return null
+  const { src, dst, color } = flow
+  if (!src || !dst) return null
+  if (![src.lat, src.lon, dst.lat, dst.lon].every(value => typeof value === 'number' && Number.isFinite(value))) {
+    return null
+  }
+
+  ensureFlowsLayer()
+
+  const latLngs = createArcLatLngs(src, dst)
+  if (!latLngs.length) return null
+
+  const polyline = L.polyline(latLngs, {
+    color: color || getSeverityColor(flow.severity),
+    weight: 2,
+    opacity: 0.85,
+    smoothFactor: 1.2,
+    className: 'attack-flow'
+  })
+
+  const sourceMarker = L.circleMarker([src.lat, src.lon], {
+    radius: 5,
+    weight: 1,
+    color: color || '#38bdf8',
+    fillColor: color || '#38bdf8',
+    opacity: 1,
+    fillOpacity: 0.9,
+    className: 'attack-node attack-node--source'
+  })
+
+  const destMarker = L.circleMarker([dst.lat, dst.lon], {
+    radius: 6,
+    weight: 2,
+    color: color || '#38bdf8',
+    fillColor: '#1e293b',
+    opacity: 1,
+    fillOpacity: 0.9,
+    className: 'attack-node attack-node--destination'
+  })
+
+  polyline.addTo(flowsLayer)
+  sourceMarker.addTo(flowsLayer)
+  destMarker.addTo(flowsLayer)
+
+  return { polyline, sourceMarker, destMarker }
+}
+
+function renderAttackFlows() {
+  if (!map) return
+  ensureFlowsLayer()
+
+  const activeIds = new Set(flows.value.map(flow => flow.id))
+
+  Array.from(flowGraphics.keys()).forEach(id => {
+    if (!activeIds.has(id)) {
+      removeFlowGraphics(id)
+    }
+  })
+
+  flows.value.forEach(flow => {
+    if (!flowGraphics.has(flow.id)) {
+      const graphics = createFlowGraphics(flow)
+      if (graphics) {
+        flowGraphics.set(flow.id, graphics)
+      }
+    }
+  })
+}
+
+function updateFlowVisualStyles() {
+  if (!flowGraphics.size) return
+  const now = Date.now()
+  flowGraphics.forEach((elements, id) => {
+    const flow = flows.value.find(item => item.id === id)
+    if (!flow) {
+      removeFlowGraphics(id)
+      return
+    }
+    const remaining = Math.max(0, flow.expiresAt - now)
+    const ratio = Math.min(1, Math.max(0, remaining / FLOW_TTL))
+    const baseOpacity = 0.2 + (ratio * 0.8)
+    elements.polyline.setStyle({ opacity: baseOpacity, weight: 2 + (ratio * 1.2) })
+    elements.sourceMarker.setStyle({
+      opacity: baseOpacity,
+      fillOpacity: Math.min(0.95, 0.3 + (ratio * 0.6))
+    })
+    elements.destMarker.setStyle({
+      opacity: baseOpacity,
+      fillOpacity: Math.min(0.95, 0.35 + (ratio * 0.55))
+    })
+  })
+}
+
+function syncThreadState() {
+  fetchAndDisplayGeoData()
+  fetchAttackFlows()
+}
+
+function handleThreadEvent() {
+  syncThreadState()
+}
+
+function handleResize() {
+  if (map) {
+    map.invalidateSize()
+  }
+}
+
+async function toggleFullscreen() {
+  isFullscreen.value = !isFullscreen.value
+  await nextTick()
+  handleResize()
+}
+
+async function exitFullscreen() {
+  if (!isFullscreen.value) return
+  isFullscreen.value = false
+  await nextTick()
+  handleResize()
+}
+
+watch(isFullscreen, () => {
+  handleResize()
+})
 
 watch(timeRange, () => {
   fetchAndDisplayGeoData()
   fetchAttackFlows()
 })
 
+watch(flows, () => {
+  renderAttackFlows()
+}, { deep: true })
+
 onMounted(async () => {
   initMap()
   await fetchAndDisplayGeoData()
   await fetchAttackFlows()
+
+  unsubscribeLocationThread = subscribeToLocationThread(handleThreadEvent)
+
+  flowFadeInterval = setInterval(() => {
+    updateFlowVisualStyles()
+    fetchAttackFlows()
+  }, 1200)
+
+  window.addEventListener('resize', handleResize)
+})
+
+onBeforeUnmount(() => {
+  if (unsubscribeLocationThread) {
+    unsubscribeLocationThread()
+  }
+  if (flowFadeInterval) {
+    clearInterval(flowFadeInterval)
+    flowFadeInterval = null
+  }
+  window.removeEventListener('resize', handleResize)
+  flowGraphics.forEach((_, id) => removeFlowGraphics(id))
 })
 </script>
 
@@ -318,6 +497,24 @@ onMounted(async () => {
 :deep(.leaflet-container) {
   background-color: #0f172a;
   border-radius: 0.5rem;
+}
+
+.fullscreen-map {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 70 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  border-radius: 0 !important;
+  border: none !important;
+}
+
+:deep(.attack-flow) {
+  filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.35));
+}
+
+:deep(.attack-node) {
+  filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.4));
 }
 
 :deep(.leaflet-control-attribution) {

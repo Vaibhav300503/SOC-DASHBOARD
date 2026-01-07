@@ -15,7 +15,7 @@
         :key="severity.name"
         @click="selectedSeverity = severity.name"
         :class="[
-          'stat-card cursor-pointer transition-all duration-300 hover:scale-[1.02]',
+          'stat-card cursor-pointer transition-all duration-300 hover:scale-[1.02] text-center-left',
           severity.name === 'Critical' ? 'card-accent-red' : 
           severity.name === 'High' ? 'card-accent-orange' :
           severity.name === 'Medium' ? 'card-accent-purple' : 'card-accent-green',
@@ -92,7 +92,7 @@
           </div>
         </div>
         <div class="flex items-end">
-          <button @click="handleSeveritySearch" class="btn-cyber w-full">
+          <button @click="fetchSeverityLogs(selectedSeverity, true)" class="btn-cyber w-full">
             <i class="fas fa-search mr-2"></i>Apply
           </button>
         </div>
@@ -197,7 +197,7 @@
                     </div>
                   </td>
                 </tr>
-                <tr v-else v-for="log in displayLogs.slice(0, 20)" :key="log.id">
+                <tr v-else v-for="log in displayLogs" :key="log.id">
                   <td class="text-slate-dark-400 text-sm">{{ formatTime(log.timestamp) }}</td>
                   <td>
                     <code class="text-cyber-400 font-mono text-sm">{{ log.source_ip }}</code>
@@ -220,6 +220,22 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+          
+          <div class="mt-4 flex items-center justify-between">
+            <div class="text-sm text-slate-dark-400">
+              Showing {{ displayLogs.length }} logs
+            </div>
+            <button 
+              v-if="hasMore"
+              @click="loadMore"
+              :disabled="isLoading"
+              class="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/50 text-cyan-400 hover:border-cyan-400 hover:shadow-lg hover:shadow-cyan-500/30 transition-all duration-300 text-sm font-medium group relative overflow-hidden disabled:opacity-50"
+            >
+              <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <i class="fas fa-chevron-down mr-2"></i>
+              <span class="relative">{{ isLoading ? 'Loading...' : 'Load More' }}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -492,6 +508,8 @@ import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useAPIStore } from '../stores/apiStore'
 import { useAuthStore } from '../stores/authStore'
 import { useToast } from '../composables/useToast.js'
+import { formatTimestamp } from '../utils/timestampFormatter.js'
+import { logsAPI } from '../api/logs'
 import axios from 'axios'
 
 const apiStore = useAPIStore()
@@ -517,25 +535,69 @@ onMounted(async () => {
   await apiStore.fetchDashboardStats()
   await apiStore.fetchRecentLogs()
   // Also fetch severity-specific logs for better accuracy
-  await fetchSeverityLogs(selectedSeverity.value)
+  await fetchSeverityLogs(selectedSeverity.value, true)
 })
 
+// Pagination state
+const currentPage = ref(1)
+const hasMore = ref(true)
+
 // Fetch logs for a specific severity from backend
-const fetchSeverityLogs = async (severity) => {
+const fetchSeverityLogs = async (severity, reset = false) => {
+  if (reset) {
+    currentPage.value = 1
+    severityLogs.value = []
+    hasMore.value = true
+  }
+  
+  isLoading.value = true
+  loadingAction.value = `Fetching ${severity} logs...`
+  
   try {
-    const data = await apiStore.fetchLogsBySeverity(severity, 500)
-    if (data && data.data) {
-      severityLogs.value = data.data
+    // Use the unified getAll endpoint which supports proper pagination and filtering
+    const response = await logsAPI.getAll({
+      severity: severity,
+      limit: 50,
+      page: currentPage.value,
+      logType: filterLogType.value || null,
+      sourceIp: filterSourceIP.value || null,
+      timeRange: filterTimeRange.value
+    })
+
+    if (response && response.data) {
+      if (reset) {
+        severityLogs.value = response.data
+      } else {
+        severityLogs.value = [...severityLogs.value, ...response.data]
+      }
+      
+      // Update hasMore based on response
+      if (response.total !== undefined) {
+         hasMore.value = severityLogs.value.length < response.total
+      } else {
+         hasMore.value = response.data.length === 50
+      }
     }
   } catch (error) {
     console.error('Error fetching severity logs:', error)
+    addToast('Failed to fetch logs', 'error')
+  } finally {
+    isLoading.value = false
+    loadingAction.value = ''
   }
 }
 
 // Watch for severity changes and fetch new logs
-watch(selectedSeverity, async (newSeverity) => {
-  await fetchSeverityLogs(newSeverity)
-})
+watch([selectedSeverity, filterLogType, filterTimeRange, filterSourceIP], () => {
+  fetchSeverityLogs(selectedSeverity.value, true)
+}, { debounce: 500 }) // Add some debounce if filters change rapidly
+
+const loadMore = () => {
+  if (!isLoading.value && hasMore.value) {
+    currentPage.value++
+    fetchSeverityLogs(selectedSeverity.value, false)
+  }
+}
 
 const severities = computed(() => {
   // Use backend severity breakdown like Dashboard does
@@ -562,42 +624,16 @@ const normalizeSeverity = (severity) => {
   return 'Low'
 }
 
-const filteredLogs = computed(() => {
-  // Prefer severity-specific logs from backend, fall back to general logs
-  const logs = severityLogs.value.length > 0 ? severityLogs.value : (apiStore.logs || [])
-  return logs.filter(log => {
-    if (!log) return false
-    // Normalize severity for comparison to match backend aggregation
-    const logSeverity = normalizeSeverity(log.severity)
-    if (logSeverity !== selectedSeverity.value) return false
-    if (filterLogType.value && log.log_type !== filterLogType.value) return false
-    if (filterSourceIP.value && !log.source_ip?.includes(filterSourceIP.value)) return false
-    return true
-  })
-})
+// Normalized logs are just the server fetched logs now
+// We assume server handles filtering correctly
+const filteredLogs = computed(() => severityLogs.value)
 
-// For SOC trustworthiness: Show ALL logs for the selected severity, not filtered by other criteria
-const allLogsForSeverity = computed(() => {
-  // Prefer severity-specific logs from backend, fall back to general logs
-  const logs = severityLogs.value.length > 0 ? severityLogs.value : (apiStore.logs || [])
-  return logs.filter(log => {
-    if (!log) return false
-    // Normalize severity for comparison to match backend aggregation
-    const logSeverity = normalizeSeverity(log.severity)
-    if (logSeverity !== selectedSeverity.value) return false
-    return true
-  })
-})
+// For SOC trustworthiness: Show ALL logs for the selected severity
+const allLogsForSeverity = computed(() => severityLogs.value)
 
-// Use this for display to match severity counts
-const displayLogs = computed(() => {
-  // If no additional filters are applied, show all logs for the severity
-  if (!filterLogType.value && !filterSourceIP.value) {
-    return allLogsForSeverity.value
-  }
-  // Otherwise show filtered logs
-  return filteredLogs.value
-})
+// Use this for display
+const displayLogs = computed(() => severityLogs.value)
+
 
 const severityDistribution = computed(() => {
   // Use backend severity breakdown like Dashboard does
@@ -649,7 +685,7 @@ const topIPsForSeverity = computed(() => {
 })
 
 const formatTime = (timestamp) => {
-  return new Date(timestamp).toLocaleString()
+  return formatTimestamp(timestamp, 'datetime')
 }
 
 // Open dropdown and position it relative to the clicked button
@@ -960,7 +996,7 @@ const showLogDetails = (log) => {
     const logDetails = {
       basic: {
         id: log.id || 'N/A',
-        timestamp: log.timestamp ? new Date(log.timestamp).toLocaleString() : 'N/A',
+        timestamp: log.timestamp ? formatTimestamp(log.timestamp, 'datetime') : 'N/A',
         severity: log.severity || 'N/A',
         logType: log.log_type || 'N/A',
         endpoint: log.endpoint || 'N/A'

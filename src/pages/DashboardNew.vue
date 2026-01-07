@@ -5,10 +5,10 @@
       <div class="relative">
         <div class="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-pink-500/10 rounded-2xl blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
         <div class="relative">
-          <h1 class="text-4xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent mb-2 animate-slide-in-left">
+          <h1 class="text-3xl font-black title-gradient tracking-tight mb-2 animate-slide-in-left">
             Security Operations Center
           </h1>
-          <p class="text-slate-400 text-lg animate-slide-in-left" style="animation-delay: 100ms">
+          <p class="text-slate-dark-400 mt-2 font-medium opacity-80 animate-slide-in-left" style="animation-delay: 100ms">
             Real-time threat monitoring and analysis
           </p>
         </div>
@@ -287,6 +287,7 @@ import { onMounted, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAPIStore } from '../stores/apiStore'
 import { useToast } from '../composables/useToast'
+import { formatTimestamp } from '../utils/timestampFormatter.js'
 import { getDisplayName } from '../utils/logTypeConstants'
 
 // Components
@@ -314,7 +315,7 @@ const displayedCases = computed(() => apiStore.hiveCases || [])
 
 const formatTime = (timestamp) => {
   if (!timestamp) return 'Unknown'
-  return new Date(timestamp).toLocaleString()
+  return formatTimestamp(timestamp, 'datetime')
 }
 
 const getSeverityClass = (severity) => {

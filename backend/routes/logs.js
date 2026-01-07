@@ -4,20 +4,11 @@ import Event from '../models/Event.js'
 import { validateLog, validateLogArray } from '../middleware/validation.js'
 import { enrichGeoData, enrichGeoDataBatch } from '../middleware/geoip.js'
 import logClassificationMiddleware from '../middleware/logClassification.js'
+import severityClassifier from '../utils/severityClassifier.js'
 import LogTypeClassifier from '../utils/logTypeClassifier.js'
 
 const router = express.Router()
 const classifier = new LogTypeClassifier()
-
-// Helper function to normalize severity values
-const normalizeSeverity = (severity) => {
-  if (!severity) return 'Low'
-  const s = String(severity).toLowerCase().trim()
-  if (s.includes('critical')) return 'Critical'
-  if (s.includes('high')) return 'High'
-  if (s.includes('medium')) return 'Medium'
-  return 'Low'
-}
 
 // Helper function to normalize log data
 const normalizeLogData = (log) => {
@@ -25,13 +16,76 @@ const normalizeLogData = (log) => {
   return {
     ...doc,
     timestamp: doc.timestamp || doc.ingested_at || doc.created_at || doc.createdAt,
-    severity: normalizeSeverity(doc.severity || doc.metadata?.severity || doc.raw_data?.severity),
+    severity: doc.severity || severityClassifier.classify(doc),
     log_type: doc.log_type || doc.metadata?.log_source || doc.raw_data?.log_source || 'System',
-    endpoint: doc.endpoint || doc.metadata?.endpoint_name || doc.raw_data?.endpoint_name || 'Unknown',
+    endpoint: doc.endpoint || doc.metadata?.endpoint_name || doc.raw_data?.endpoint_name || doc.metadata?.hostname || doc.raw_data?.hostname || 'Unknown',
     source_ip: doc.source_ip || doc.ip_address || doc.metadata?.ip_address || doc.raw_data?.src_ip || '0.0.0.0',
     dest_ip: doc.dest_ip || doc.raw_data?.dst_ip || '0.0.0.0'
   }
 }
+
+/**
+ * GET /api/logs/endpoints/aggregated
+ * Get aggregated endpoint data (optimized for topology)
+ * Much faster than fetching all logs
+ */
+router.get('/endpoints/aggregated', async (req, res) => {
+  try {
+    console.log('📊 Aggregating endpoints from logs...')
+
+    const pipeline = [
+      {
+        $addFields: {
+          endpoint: { $ifNull: ['$endpoint', '$metadata.endpoint_name', '$metadata.hostname', '$raw_data.hostname', 'Unknown'] },
+          severity: { $ifNull: ['$severity', 'Low'] }
+        }
+      },
+      {
+        $group: {
+          _id: '$endpoint',
+          endpoint_name: { $first: '$endpoint' },
+          hostname: { $first: { $ifNull: ['$metadata.hostname', '$raw_data.hostname', '$endpoint'] } },
+          ip_address: { $first: { $ifNull: ['$source_ip', '$ip_address', '$raw_data.ip_address', 'N/A'] } },
+          os_type: { $first: { $ifNull: ['$metadata.os_type', '$raw_data.os_type', 'Unknown'] } },
+          eventCount: { $sum: 1 },
+          criticalCount: { $sum: { $cond: [{ $eq: ['$severity', 'High'] }, 1, 0] } },
+          last_seen: { $max: '$timestamp' }
+        }
+      },
+      {
+        $sort: { eventCount: -1 }
+      },
+      {
+        $project: {
+          _id: 1,
+          endpoint_name: 1,
+          hostname: 1,
+          ip_address: 1,
+          os_type: 1,
+          eventCount: 1,
+          criticalCount: 1,
+          last_seen: 1,
+          status: {
+            $cond: [{ $gt: ['$criticalCount', 0] }, 'degraded', 'active']
+          }
+        }
+      }
+    ]
+
+    const endpoints = await Log.aggregate(pipeline)
+
+    console.log(`✅ Aggregated ${endpoints.length} unique endpoints`)
+
+    res.json({
+      success: true,
+      data: endpoints,
+      total: endpoints.length
+    })
+  } catch (error) {
+    console.error('Error aggregating endpoints:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
 
 /**
  * POST /api/logs/ingest
@@ -101,6 +155,9 @@ router.get('/', async (req, res) => {
     // Build aggregation pipeline
     const pipeline = []
 
+    // Initial match conditions
+    const initialMatch = {}
+
     // Time range filter (if specified)
     if (timeRange !== 'all') {
       const hoursMap = {
@@ -113,16 +170,21 @@ router.get('/', async (req, res) => {
       const hoursAgo = hoursMap[timeRange] || 24
       const since = new Date(Date.now() - hoursAgo * 60 * 60 * 1000)
 
-      pipeline.push({
-        $match: {
-          $or: [
-            { timestamp: { $gte: since } },
-            { ingested_at: { $gte: since } },
-            { created_at: { $gte: since } },
-            { createdAt: { $gte: since } }
-          ]
-        }
-      })
+      initialMatch.$or = [
+        { timestamp: { $gte: since } },
+        { ingested_at: { $gte: since } },
+        { created_at: { $gte: since } },
+        { createdAt: { $gte: since } }
+      ]
+    }
+
+    // Optimize: Apply severity filter EARLY since it's now indexed and populated
+    if (severity) {
+      initialMatch.severity = severity
+    }
+
+    if (Object.keys(initialMatch).length > 0) {
+      pipeline.push({ $match: initialMatch })
     }
 
     // Add field mapping with standardized log types
@@ -158,19 +220,10 @@ router.get('/', async (req, res) => {
           }
         },
         original_log_type: { $ifNull: ['$original_log_type', '$metadata.log_source', 'unknown'] },
-        endpoint: { $ifNull: ['$metadata.endpoint_name', '$metadata.hostname', 'Unknown'] },
+        endpoint: { $ifNull: ['$endpoint', '$metadata.endpoint_name', '$metadata.hostname', '$raw_data.hostname', 'Unknown'] },
         source_ip: { $ifNull: ['$ip_address', '$raw_data.src_ip', 'Unknown'] },
-        dest_ip: { $ifNull: ['$raw_data.dst_ip', 'Unknown'] },
-        // Assign severity based on log source since all DB severities are null
-        severity: {
-          $switch: {
-            branches: [
-              { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /security|intrusion|malware|Security/i } }, then: 'High' },
-              { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /error|fail|critical|kernel/i } }, then: 'Medium' }
-            ],
-            default: 'Low'
-          }
-        },
+        // Assign severity based on stored field
+        severity: { $ifNull: ['$severity', 'Low'] },
         protocol: { $ifNull: ['$raw_data.protocol', 'N/A'] },
         port: { $ifNull: ['$raw_data.src_port', 'N/A'] },
         action: { $ifNull: ['$raw_data.status', '$parsed_data.event_action', 'N/A'] }
@@ -179,7 +232,7 @@ router.get('/', async (req, res) => {
 
     // Apply filters after field mapping
     const matchConditions = {}
-    if (severity) matchConditions.severity = severity
+    // Severity is handled in initial match for performance
     if (logType) matchConditions.log_type = logType
     if (action) matchConditions.action = action
 
@@ -244,13 +297,13 @@ router.get('/', async (req, res) => {
  */
 router.get('/recent', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 100
+    const limit = Math.min(parseInt(req.query.limit) || 999999, 999999)
     const severity = req.query.severity
     const logType = req.query.logType
 
     // Build aggregation pipeline
     const pipeline = []
-    
+
     // Add fields mapping first with standardized log types
     pipeline.push({
       $addFields: {
@@ -284,19 +337,10 @@ router.get('/recent', async (req, res) => {
           }
         },
         original_log_type: { $ifNull: ['$original_log_type', '$metadata.log_source', 'unknown'] },
-        endpoint: { $ifNull: ['$metadata.endpoint_name', '$metadata.hostname', 'Unknown'] },
+        endpoint: { $ifNull: ['$endpoint', '$metadata.endpoint_name', '$metadata.hostname', '$raw_data.hostname', 'Unknown'] },
         source_ip: { $ifNull: ['$ip_address', '$raw_data.src_ip', 'Unknown'] },
-        dest_ip: { $ifNull: ['$raw_data.dst_ip', 'Unknown'] },
-        // Assign severity based on log source since all DB severities are null
-        severity: {
-          $switch: {
-            branches: [
-              { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /security|intrusion|malware|Security/i } }, then: 'High' },
-              { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /error|fail|critical|kernel/i } }, then: 'Medium' }
-            ],
-            default: 'Low'
-          }
-        },
+        // Assign severity based on stored field
+        severity: { $ifNull: ['$severity', 'Low'] },
         protocol: { $ifNull: ['$raw_data.protocol', 'N/A'] },
         port: { $ifNull: ['$raw_data.src_port', 'N/A'] },
         action: { $ifNull: ['$raw_data.status', '$parsed_data.event_action', 'N/A'] }
@@ -305,11 +349,11 @@ router.get('/recent', async (req, res) => {
 
     // Add filters after field mapping
     const matchConditions = {}
-    
+
     if (severity) {
       matchConditions.severity = severity
     }
-    
+
     if (logType) {
       matchConditions.log_type = logType
     }
@@ -593,73 +637,12 @@ router.get('/ip/:ip', async (req, res) => {
 router.get('/severity/:level', async (req, res) => {
   try {
     const { level } = req.params
-    const limit = Math.min(parseInt(req.query.limit) || 100, 1000)
+    const limit = parseInt(req.query.limit) || 100
 
-    // Use aggregation to properly normalize and match severity
-    const logs = await Log.aggregate([
-      {
-        $addFields: {
-          normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          rawSeverity: { 
-            $toString: { 
-              $ifNull: ['$severity', '$metadata.severity', '$raw_data.severity', '$raw.severity', 'Low'] 
-            } 
-          },
-          normSourceIP: { $ifNull: ['$source_ip', '$ip_address', '$metadata.ip_address', '$raw_data.src_ip', '$raw.source_ip', 'Unknown'] },
-          normDestIP: { $ifNull: ['$dest_ip', '$raw_data.dst_ip', '$raw.dest_ip', 'Unknown'] },
-          normLogType: { $ifNull: ['$log_type', '$metadata.log_source', '$raw_data.log_source', '$raw.log_type', 'System'] },
-          normEndpoint: { $ifNull: ['$endpoint', '$metadata.endpoint_name', '$raw_data.endpoint_name', '$raw.endpoint', 'Unknown'] }
-        }
-      },
-      {
-        $addFields: {
-          lowerSeverity: { $toLower: '$rawSeverity' }
-        }
-      },
-      {
-        $addFields: {
-          normSeverity: {
-            $switch: {
-              branches: [
-                { case: { $regexMatch: { input: '$lowerSeverity', regex: /critical/i } }, then: 'Critical' },
-                { case: { $regexMatch: { input: '$lowerSeverity', regex: /high/i } }, then: 'High' },
-                { case: { $regexMatch: { input: '$lowerSeverity', regex: /medium/i } }, then: 'Medium' },
-                { case: { $regexMatch: { input: '$lowerSeverity', regex: /low/i } }, then: 'Low' }
-              ],
-              default: 'Low'
-            }
-          }
-        }
-      },
-      {
-        $match: { normSeverity: level }
-      },
-      {
-        $sort: { normTimestamp: -1 }
-      },
-      {
-        $limit: limit
-      },
-      {
-        $project: {
-          _id: 1,
-          id: '$_id',
-          timestamp: '$normTimestamp',
-          severity: '$normSeverity',
-          source_ip: '$normSourceIP',
-          dest_ip: '$normDestIP',
-          log_type: '$normLogType',
-          endpoint: '$normEndpoint',
-          raw: 1,
-          raw_data: 1,
-          metadata: 1,
-          geo: 1,
-          protocol: { $ifNull: ['$raw.protocol', '$raw_data.protocol', '$protocol', 'N/A'] },
-          port: { $ifNull: ['$raw.port', '$raw_data.port', '$port', 'N/A'] },
-          action: { $ifNull: ['$raw.action', '$raw_data.action', '$action', 'N/A'] }
-        }
-      }
-    ])
+    // Optimized query using the existing index (severity is now populated)
+    const logs = await Log.find({ severity: level })
+      .sort({ timestamp: -1 })
+      .limit(limit)
 
     res.json({ data: logs, total: logs.length })
   } catch (error) {
@@ -705,7 +688,7 @@ router.get('/endpoint/:endpoint', async (req, res) => {
         timestamp: doc.timestamp || doc.ingested_at || doc.created_at || doc.createdAt,
         severity: doc.severity || doc.metadata?.severity || doc.raw_data?.severity || 'Low',
         log_type: doc.log_type || doc.metadata?.log_source || doc.raw_data?.log_source || 'System',
-        endpoint: doc.endpoint || doc.metadata?.endpoint_name || doc.raw_data?.endpoint_name || 'Unknown',
+        endpoint: doc.endpoint || doc.metadata?.endpoint_name || doc.raw_data?.endpoint_name || doc.metadata?.hostname || doc.raw_data?.hostname || 'Unknown',
         source_ip: doc.source_ip || doc.ip_address || doc.metadata?.ip_address || doc.raw_data?.src_ip || '0.0.0.0',
         dest_ip: doc.dest_ip || doc.raw_data?.dst_ip || '0.0.0.0'
       }
@@ -758,7 +741,7 @@ router.get('/search', async (req, res) => {
 
     const logs = await Log.find(query)
       .sort({ timestamp: -1 })
-      .limit(Math.min(parseInt(limit), 1000))
+      .limit(parseInt(limit))
       .skip(parseInt(offset))
 
     const total = await Log.countDocuments(query)
@@ -770,7 +753,7 @@ router.get('/search', async (req, res) => {
         timestamp: doc.timestamp || doc.ingested_at || doc.created_at || doc.createdAt,
         severity: doc.severity || doc.metadata?.severity || doc.raw_data?.severity || 'Low',
         log_type: doc.log_type || doc.metadata?.log_source || doc.raw_data?.log_source || 'System',
-        endpoint: doc.endpoint || doc.metadata?.endpoint_name || doc.raw_data?.endpoint_name || 'Unknown',
+        endpoint: doc.endpoint || doc.metadata?.endpoint_name || doc.raw_data?.endpoint_name || doc.metadata?.hostname || doc.raw_data?.hostname || 'Unknown',
         source_ip: doc.source_ip || doc.ip_address || doc.metadata?.ip_address || doc.raw_data?.src_ip || '0.0.0.0',
         dest_ip: doc.dest_ip || doc.raw_data?.dst_ip || '0.0.0.0'
       }
@@ -883,3 +866,4 @@ router.get('/registry/stats', async (req, res) => {
 })
 
 export default router
+

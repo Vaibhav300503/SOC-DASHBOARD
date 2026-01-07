@@ -26,20 +26,26 @@ const DEMO_USERS = {
 export const useAuthStore = defineStore('auth', () => {
   // State
   const user = ref(null)
-  const isAuthenticated = computed(() => !!user.value)
+  const token = ref(null)
+  const isAuthenticated = computed(() => !!user.value && !!token.value)
   const loading = ref(false)
   const error = ref(null)
   const demoMode = ref(DEMO_MODE)
 
-  // Initialize user from localStorage
+  // Initialize user and token from localStorage
   const initializeUser = () => {
     const storedUser = localStorage.getItem('user')
-    if (storedUser) {
+    const storedToken = localStorage.getItem('token')
+    
+    if (storedUser && storedToken) {
       try {
         user.value = JSON.parse(storedUser)
+        token.value = storedToken
+        console.log('Restored user from localStorage:', user.value.email)
       } catch (e) {
         console.error('Failed to parse stored user:', e)
         localStorage.removeItem('user')
+        localStorage.removeItem('token')
       }
     }
   }
@@ -66,9 +72,19 @@ export const useAuthStore = defineStore('auth', () => {
             role: demoUser.role
           }
           
-          // Store user data
+          // Create demo token
+          const demoToken = btoa(JSON.stringify({ 
+            userId: demoUser.id, 
+            email: demoUser.email,
+            role: demoUser.role,
+            demo: true 
+          }))
+          
+          // Store user data and token
           user.value = userData
+          token.value = demoToken
           localStorage.setItem('user', JSON.stringify(userData))
+          localStorage.setItem('token', demoToken)
           
           // Set session data
           const now = Date.now()
@@ -98,7 +114,9 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (response.data.success) {
         user.value = response.data.user
+        token.value = response.data.token
         localStorage.setItem('user', JSON.stringify(response.data.user))
+        localStorage.setItem('token', response.data.token)
         localStorage.removeItem('demoMode')
         
         // Set session data
@@ -123,13 +141,25 @@ export const useAuthStore = defineStore('auth', () => {
       if (demoMode.value && DEMO_USERS[credentials.email]) {
         const demoUser = DEMO_USERS[credentials.email]
         if (demoUser.password === credentials.password) {
-          user.value = {
+          const userData = {
             _id: demoUser.id,
             email: demoUser.email,
             name: demoUser.name,
             role: demoUser.role
           }
-          localStorage.setItem('user', JSON.stringify(user.value))
+          
+          // Create demo token
+          const demoToken = btoa(JSON.stringify({ 
+            userId: demoUser.id, 
+            email: demoUser.email,
+            role: demoUser.role,
+            demo: true 
+          }))
+          
+          user.value = userData
+          token.value = demoToken
+          localStorage.setItem('user', JSON.stringify(userData))
+          localStorage.setItem('token', demoToken)
           localStorage.setItem('demoMode', 'true')
           return {
             success: true,
@@ -164,9 +194,11 @@ export const useAuthStore = defineStore('auth', () => {
       })
 
       if (response.data.success) {
-        // Store user data from registration response
+        // Store user data and token from registration response
         user.value = response.data.user
+        token.value = response.data.token
         localStorage.setItem('user', JSON.stringify(response.data.user))
+        localStorage.setItem('token', response.data.token)
         localStorage.removeItem('demoMode')
         
         // Set session data
@@ -203,9 +235,17 @@ export const useAuthStore = defineStore('auth', () => {
   const fetchUser = async () => {
     // Check localStorage first
     const storedUser = localStorage.getItem('user')
-    if (storedUser) {
-      user.value = JSON.parse(storedUser)
-      return true
+    const storedToken = localStorage.getItem('token')
+    if (storedUser && storedToken) {
+      try {
+        user.value = JSON.parse(storedUser)
+        token.value = storedToken
+        return true
+      } catch (e) {
+        console.error('Failed to parse stored user:', e)
+        localStorage.removeItem('user')
+        localStorage.removeItem('token')
+      }
     }
     
     // If no stored user but we have a session, try to fetch from server
@@ -232,9 +272,11 @@ export const useAuthStore = defineStore('auth', () => {
   const logout = () => {
     // Clear user data
     user.value = null
+    token.value = null
     
     // Clear local storage
     localStorage.removeItem('user')
+    localStorage.removeItem('token')
     localStorage.removeItem('demoMode')
     localStorage.removeItem('loginTime')
     localStorage.removeItem('lastActionTime')
@@ -263,6 +305,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     // State
     user,
+    token,
     isAuthenticated,
     loading,
     error,

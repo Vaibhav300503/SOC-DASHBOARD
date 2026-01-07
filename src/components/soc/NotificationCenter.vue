@@ -47,6 +47,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAPIStore } from '../../stores/apiStore'
+import { formatTimestamp } from '../../utils/timestampFormatter.js'
 
 const apiStore = useAPIStore()
 const notifications = ref([])
@@ -244,7 +245,7 @@ const setupAlertStream = () => {
 }
 
 const formatTime = (timestamp) => {
-  return new Date(timestamp).toLocaleString()
+  return formatTimestamp(timestamp, 'datetime')
 }
 
 onMounted(() => {

@@ -139,6 +139,31 @@ router.post('/avatar', requireAuth, upload.single('avatar'), async (req, res) =>
  */
 router.get('/stats', requireAuth, async (req, res) => {
   try {
+    // In development with bypassed auth, create mock stats
+    if (process.env.NODE_ENV === 'development' && process.env.BYPASS_AUTH === 'true') {
+      return res.json({
+        success: true,
+        data: {
+          loginCount: 42,
+          lastLogin: new Date(),
+          lastActivity: new Date(),
+          activity: {
+            lastActivity: new Date(),
+            totalLogins: 42,
+            totalSessions: 38,
+            avgSessionDuration: 3600,
+            mostActiveHour: 14,
+            loginStreak: 7
+          },
+          alertsCreated: 15,
+          logsViewed: 1250,
+          reportsGenerated: 8,
+          profileCompletion: 85,
+          joinDate: new Date('2024-01-01')
+        }
+      })
+    }
+
     const user = await User.findById(req.user.userId)
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' })

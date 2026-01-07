@@ -3,8 +3,8 @@
     <!-- Page Header -->
     <div class="flex items-center justify-between mb-2">
       <div>
-        <h1 class="text-2xl font-bold text-slate-50 tracking-tight">Security Operations Center</h1>
-        <p class="text-slate-400 mt-1 text-sm">Real-time threat monitoring and analysis</p>
+        <h1 class="text-3xl font-black title-gradient tracking-tight">Security Operations Center</h1>
+        <p class="text-slate-dark-400 mt-2 font-medium opacity-80">Real-time threat monitoring and analysis</p>
       </div>
       <div class="flex gap-3">
         <button 
@@ -251,6 +251,7 @@
 import { onMounted, computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAPIStore } from '../stores/apiStore'
+import { formatTimestamp } from '../utils/timestampFormatter.js'
 import NetworkGraphLight from '../components/soc/NetworkGraphLight.vue'
 import SeverityChart from '../components/soc/SeverityChart.vue'
 import IpTable from '../components/soc/IpTable.vue'
@@ -269,7 +270,7 @@ const lastRefreshAt = ref(0)
  
 const formatTime = (timestamp) => {
   if (!timestamp) return 'Unknown'
-  return new Date(timestamp).toLocaleString()
+  return formatTimestamp(timestamp, 'datetime')
 }
 
 const getCriticalCount = () => {

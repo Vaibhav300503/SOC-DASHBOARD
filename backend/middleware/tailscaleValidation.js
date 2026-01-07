@@ -1,5 +1,33 @@
 import Joi from 'joi';
 
+const normalizeDeviceOs = (os) => {
+  if (!os) return 'unknown'
+
+  const value = String(os).trim().toLowerCase()
+
+  const osMap = {
+    win: 'windows',
+    windows: 'windows',
+    mac: 'macos',
+    macos: 'macos',
+    darwin: 'macos',
+    ios: 'ios',
+    ipad: 'ios',
+    iphone: 'ios',
+    android: 'android',
+    linux: 'linux',
+    freebsd: 'linux'
+  }
+
+  if (osMap[value]) return osMap[value]
+
+  if (['unknown', 'custom', 'other'].includes(value)) {
+    return 'unknown'
+  }
+
+  return 'unknown'
+}
+
 // Device data validation schema - allows extra Tailscale API fields
 const deviceSchema = Joi.object({
   id: Joi.string().required().pattern(/^[a-zA-Z0-9_-]+$/),
@@ -21,7 +49,12 @@ const deviceSchema = Joi.object({
 
 // Validate device data before processing
 export const validateDeviceData = (device) => {
-  const { error, value } = deviceSchema.validate(device, {
+  const sanitizedDevice = {
+    ...device,
+    os: normalizeDeviceOs(device?.os)
+  }
+
+  const { error, value } = deviceSchema.validate(sanitizedDevice, {
     abortEarly: false,
     stripUnknown: true
   });
@@ -36,7 +69,13 @@ export const validateDeviceData = (device) => {
 
 // Batch validation for multiple devices
 export const validateDeviceBatch = (devices) => {
-  const results = devices.map(device => validateDeviceData(device));
+  const results = devices.map(device => {
+    const result = validateDeviceData(device)
+    if (!result.isValid) {
+      result.originalData = device
+    }
+    return result
+  });
   const validDevices = results
     .filter(r => r.isValid)
     .map(r => r.data);

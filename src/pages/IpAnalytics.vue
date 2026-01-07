@@ -83,11 +83,11 @@
             </div>
             <div class="flex justify-between">
               <span class="text-slate-dark-400">First Seen:</span>
-              <span class="text-slate-dark-300">{{ searchResults.firstSeen ? new Date(searchResults.firstSeen).toLocaleString() : 'N/A' }}</span>
+              <span class="text-slate-dark-300">{{ searchResults.firstSeen ? formatTimestamp(searchResults.firstSeen, 'datetime') : 'N/A' }}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-slate-dark-400">Last Seen:</span>
-              <span class="text-slate-dark-300">{{ searchResults.lastSeen ? new Date(searchResults.lastSeen).toLocaleString() : 'N/A' }}</span>
+              <span class="text-slate-dark-300">{{ searchResults.lastSeen ? formatTimestamp(searchResults.lastSeen, 'datetime') : 'N/A' }}</span>
             </div>
           </div>
         </div>
@@ -133,7 +133,7 @@
                 <span class="text-slate-dark-500">→</span>
                 <span class="text-sm font-mono text-cyber-400">{{ log.dest_ip }}</span>
               </div>
-              <span class="text-xs text-slate-dark-500">{{ new Date(log.timestamp).toLocaleString() }}</span>
+              <span class="text-xs text-slate-dark-500">{{ formatTimestamp(log.timestamp, 'datetime') }}</span>
             </div>
             <div class="text-xs text-slate-dark-400 mt-1">
               {{ log.log_type }} • {{ log.endpoint }}
@@ -145,19 +145,19 @@
 
     <!-- IP Statistics -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <div class="stat-card card-accent-cyan">
+      <div class="stat-card card-accent-cyan text-center-left">
         <div class="stat-value text-accent-primary">{{ uniqueIPs }}</div>
         <div class="stat-label">Unique IPs</div>
       </div>
-      <div class="stat-card card-accent-red">
+      <div class="stat-card card-accent-red text-center-left">
         <div class="stat-value text-neon-red">{{ criticalIPs }}</div>
         <div class="stat-label">Critical IPs</div>
       </div>
-      <div class="stat-card card-accent-orange">
+      <div class="stat-card card-accent-orange text-center-left">
         <div class="stat-value text-neon-orange">{{ avgAlertsPerIP }}</div>
         <div class="stat-label">Avg Alerts/IP</div>
       </div>
-      <div class="stat-card card-accent-green">
+      <div class="stat-card card-accent-green text-center-left">
         <div class="stat-value text-neon-green text-sm font-mono truncate">{{ topIP.ip || 'N/A' }}</div>
         <div class="stat-label">Most Active IP</div>
       </div>
@@ -234,6 +234,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAPIStore } from '../stores/apiStore'
+import { formatTimestamp } from '../utils/timestampFormatter.js'
 import IpTable from '../components/soc/IpTable.vue'
 import { normalizeSeverity } from '../utils/severityNormalization'
 
@@ -306,19 +307,7 @@ const getSeverityLabel = (severity) => {
 
 const formatTimeAgo = (date) => {
   if (!date) return 'N/A'
-  
-  const now = new Date()
-  const diffMs = now - new Date(date)
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-  
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins} min ago`
-  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
-  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
-  
-  return new Date(date).toLocaleDateString()
+  return formatTimestamp(date, 'relative')
 }
 
 const handleIPSearch = async () => {

@@ -238,12 +238,16 @@ const getLogTypeClass = (logType) => {
 
 const formatDate = (timestamp) => {
   if (!timestamp) return 'N/A'
-  return new Date(timestamp).toLocaleString('en-US', {
+  const date = new Date(timestamp)
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
     month: 'short',
-    day: '2-digit',
+    day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit'
+    second: '2-digit',
+    hour12: true,
+    timeZone: 'UTC'
   })
 }
 

@@ -5,6 +5,7 @@
  */
 
 import LogTypeClassifier from '../utils/logTypeClassifier.js';
+import severityClassifier from '../utils/severityClassifier.js';
 
 class LogClassificationMiddleware {
   constructor() {
@@ -21,13 +22,13 @@ class LogClassificationMiddleware {
     try {
       // Handle both single log and array of logs
       let logs = Array.isArray(req.body) ? req.body : [req.body];
-      
+
       // Apply classification to each log
       logs = logs.map(log => this.classifyLog(log));
-      
+
       // Update request body with classified logs
       req.body = Array.isArray(req.body) ? logs : logs[0];
-      
+
       next();
     } catch (error) {
       console.error('Error in log classification middleware:', error);
@@ -45,21 +46,25 @@ class LogClassificationMiddleware {
     try {
       // Get the standardized log type
       const standardizedType = this.classifier.classify(log);
-      
+
       // Preserve original log type information
       const originalLogType = log.metadata?.log_source || log.log_type || 'unknown';
-      
+
       // Get classification metadata
       const classificationMetadata = this.classifier.getClassificationMetadata();
-      
+
+      // Calculate severity
+      const severity = severityClassifier.classify(log);
+
       // Return log with classification applied
       return {
         ...log,
         log_type: standardizedType,
         original_log_type: originalLogType,
+        severity: severity,
         ...classificationMetadata
       };
-      
+
     } catch (error) {
       console.error('Error classifying individual log:', error);
       // Return original log if classification fails

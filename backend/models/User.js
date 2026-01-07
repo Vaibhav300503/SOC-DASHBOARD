@@ -27,8 +27,9 @@ const userSchema = new mongoose.Schema({
   },
   lastName: {
     type: String,
-    required: true,
-    trim: true
+    required: false,
+    trim: true,
+    default: ''
   },
   role: {
     type: String,
@@ -123,13 +124,20 @@ userSchema.methods.comparePassword = async function(plainPassword) {
 
 // Virtual for full name
 userSchema.virtual('fullName').get(function() {
-  return `${this.firstName} ${this.lastName}`
+  if (this.lastName && this.lastName.trim()) {
+    return `${this.firstName} ${this.lastName}`
+  }
+  return this.firstName
 })
 
 // Virtual for profile completion
 userSchema.virtual('profileCompletion').get(function() {
   let completion = 0
-  const fields = ['firstName', 'lastName', 'email', 'department', 'phone', 'bio']
+  const fields = ['firstName', 'email', 'department', 'bio']
+  // Only count lastName if it has a value
+  if (this.lastName && this.lastName.trim()) {
+    fields.push('lastName')
+  }
   fields.forEach(field => {
     if (this[field] && this[field].toString().trim()) completion += 100 / fields.length
   })

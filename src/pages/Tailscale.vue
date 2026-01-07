@@ -3,8 +3,8 @@
     <!-- Page Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold text-slate-dark-50">Tailscale Integration</h1>
-        <p class="text-slate-dark-400 mt-2">Monitor Tailscale network activity and connections</p>
+        <h1 class="text-3xl font-black title-gradient tracking-tight">Tailscale Integration</h1>
+        <p class="text-slate-dark-400 mt-2 font-medium opacity-80">Monitor Tailscale network activity and connections</p>
       </div>
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-2">
@@ -232,6 +232,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { formatTimestamp } from '../utils/timestampFormatter.js'
 import TailscaleStats from '../components/soc/TailscaleStats.vue'
 import NetworkTopology from '../components/soc/NetworkTopology.vue'
 import { tailscaleStreamService } from '../services/tailscaleStreamService'
@@ -347,7 +348,7 @@ const addRealtimeEvent = (log) => {
   }
   
   const event = {
-    timestamp: new Date(log.ts || log.timestamp).toLocaleTimeString(),
+    timestamp: formatTimestamp(log.ts || log.timestamp, 'time'),
     type: eventType,
     message: log.message || log.event || `${log.type} from ${log.user || 'unknown'}`
   }
@@ -391,7 +392,7 @@ const updateStats = (log) => {
         user: log.user,
         device: log.user.split('@')[0] || 'Unknown Device',
         ip: log.src,
-        loginTime: new Date(log.ts).toLocaleTimeString(),
+        loginTime: formatTimestamp(log.ts, 'time'),
         lastActivity: 'just now'
       })
       
@@ -434,7 +435,7 @@ const processRecentLogs = (logs) => {
           user: log.user,
           device: log.user.split('@')[0] || 'Unknown Device',
           ip: log.src,
-          loginTime: new Date(log.ts).toLocaleTimeString(),
+          loginTime: formatTimestamp(log.ts, 'time'),
           lastActivity: formatTimeAgo(log.ts)
         })
       }
@@ -511,7 +512,7 @@ const fetchTailscaleData = async () => {
               user: device.user,
               device: device.name || 'Unknown Device',
               ip: device.ip || 'Unknown IP',
-              loginTime: new Date(device.lastSeen).toLocaleTimeString(),
+              loginTime: formatTimestamp(device.lastSeen, 'time'),
               lastActivity: formatTimeAgo(device.lastSeen)
             })
           }
@@ -523,7 +524,7 @@ const fetchTailscaleData = async () => {
     // Initialize real-time events from devices activity
     if (devicesResponse.data && devicesResponse.data.data) {
       realtimeEvents.value = devicesResponse.data.data.slice(0, 10).map((device, idx) => ({
-        timestamp: new Date(device.lastSeen).toLocaleTimeString(),
+        timestamp: formatTimestamp(device.lastSeen, 'time'),
         type: device.status === 'online' ? 'CONNECTED' : 'DISCONNECTED',
         message: `Device "${device.name}" is ${device.status}`
       }))
@@ -637,14 +638,8 @@ const formatEventTitle = (type) => {
 }
 
 const formatTimeAgo = (timestamp) => {
-  const now = new Date()
-  const time = new Date(timestamp)
-  const diff = Math.floor((now - time) / 1000) // seconds
-  
-  if (diff < 60) return 'just now'
-  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`
-  return `${Math.floor(diff / 86400)} days ago`
+  if (!timestamp) return 'N/A'
+  return formatTimestamp(timestamp, 'relative')
 }
 
 const exportTailscaleData = async () => {

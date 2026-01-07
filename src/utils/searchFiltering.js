@@ -54,7 +54,9 @@ export const normalizeLog = (log) => {
  */
 export const applySeverityFilter = (log, severity) => {
   if (!severity) return true
-  return log.severity === severity
+  // Normalize both the log severity and filter value for comparison
+  const normalizedFilterSeverity = normalizeSeverity(severity)
+  return log.severity === normalizedFilterSeverity
 }
 
 /**

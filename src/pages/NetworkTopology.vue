@@ -3,8 +3,8 @@
     <!-- Page Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold text-slate-dark-50">Network Topology</h1>
-        <p class="text-slate-dark-400 mt-2">Interactive network graph visualization</p>
+        <h1 class="text-3xl font-black title-gradient tracking-tight">Network Topology</h1>
+        <p class="text-slate-dark-400 mt-2 font-medium opacity-80">Interactive network graph visualization</p>
       </div>
       <div class="flex gap-3">
         <button @click="refreshData" class="btn-cyber-outline">

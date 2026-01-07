@@ -17,6 +17,7 @@
     "axios": "^1.13.2",
     "d3": "^7.9.0",
     "date-fns": "^2.30.0",
+    "express": "^5.2.1",
     "http-proxy": "^1.18.1",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
@@ -26,7 +27,7 @@
     "vue": "^3.3.4",
     "vue-router": "^4.2.4",
     "vue3-apexcharts": "1.7.0",
-    "ws": "^8.18.3"
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.3.4",

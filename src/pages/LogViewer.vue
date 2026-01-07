@@ -3,8 +3,8 @@
     <!-- Page Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold text-slate-dark-50">Log Viewer</h1>
-        <p class="text-slate-dark-400 mt-2">Universal JSON log viewer with advanced search and filtering</p>
+        <h1 class="text-3xl font-black title-gradient tracking-tight">Log Viewer</h1>
+        <p class="text-slate-dark-400 mt-2 font-medium opacity-80">Universal JSON log viewer with advanced search and filtering</p>
       </div>
     </div>
 
@@ -90,28 +90,35 @@
       </div>
     </div>
 
-    <!-- Results Summary -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <div class="stat-card">
-        <div class="stat-value text-cyber-400">{{ apiStore.totalLogs }}</div>
-        <div class="stat-label">Total Logs</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value text-neon-red">{{ criticalInResults }}</div>
-        <div class="stat-label">Critical</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value text-neon-orange">{{ highInResults }}</div>
-        <div class="stat-label">High</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value text-neon-green">{{ lowInResults }}</div>
-        <div class="stat-label">Low</div>
+    <!-- Raw Log Viewer -->
+    <div class="space-y-4">
+      <h2 class="text-2xl font-black title-gradient tracking-tight">Raw Log Viewer</h2>
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div class="stat-card text-center">
+          <div class="stat-value text-cyber-400">{{ apiStore.totalLogs }}</div>
+          <div class="stat-label">Total Logs</div>
+        </div>
+        <div class="stat-card text-center">
+          <div class="stat-value text-neon-red">{{ criticalInResults }}</div>
+          <div class="stat-label">Critical</div>
+        </div>
+        <div class="stat-card text-center">
+          <div class="stat-value text-neon-orange">{{ highInResults }}</div>
+          <div class="stat-label">High</div>
+        </div>
+        <div class="stat-card text-center">
+          <div class="stat-value text-neon-yellow">{{ mediumInResults }}</div>
+          <div class="stat-label">Medium</div>
+        </div>
+        <div class="stat-card text-center">
+          <div class="stat-value text-neon-green">{{ lowInResults }}</div>
+          <div class="stat-label">Low</div>
+        </div>
       </div>
     </div>
 
     <!-- Logs List -->
-    <div class="card-glass p-6 rounded-xl">
+    <div class="card-glass p-6 rounded-xl relative">
       <div class="flex items-center justify-between mb-6">
         <h3 class="text-lg font-semibold text-slate-dark-50">Logs</h3>
         <div class="flex gap-2">
@@ -122,6 +129,19 @@
             <i :class="['fas', isCopying ? 'fa-spinner fa-spin' : 'fa-copy', 'mr-1']"></i>
             {{ getCopyButtonText() }}
           </button>
+        </div>
+      </div>
+
+      <!-- Loading Overlay -->
+      <div v-if="isSearching" class="absolute inset-0 bg-black/40 backdrop-blur-sm rounded-lg flex items-center justify-center z-50">
+        <div class="bg-slate-dark-800 border border-slate-dark-600 rounded-lg p-8 flex flex-col items-center gap-4">
+          <div class="animate-spin">
+            <i class="fas fa-spinner text-cyber-400 text-3xl"></i>
+          </div>
+          <div class="text-center">
+            <p class="text-slate-dark-50 font-semibold">Filtering Logs...</p>
+            <p class="text-slate-dark-400 text-sm mt-1">Please wait while we process your filters</p>
+          </div>
         </div>
       </div>
 
@@ -221,6 +241,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAPIStore } from '../stores/apiStore'
+import { formatTimestamp } from '../utils/timestampFormatter.js'
 import { useSearch } from '../composables/useSearch'
 import axios from 'axios'
 
@@ -241,8 +262,10 @@ const {
   getTopSourceIPs,
   getTopEndpoints,
   searchQuery,
-  filters
-} = useSearch({ pageSize: 10 })
+  filters,
+  isSearching,
+  fetchData
+} = useSearch({ pageSize: 10, serverSide: true })
 
 const expandedLogs = ref([])
 const isCopying = ref(false)
@@ -252,8 +275,11 @@ const copiedIndividualId = ref(null)
 const useRegex = ref(false)
 
 onMounted(async () => {
-  await apiStore.fetchRecentLogs()
+  await fetchData() // Trigger server-side fetch
   await apiStore.fetchDashboardStats()
+  
+  // Debug: Log severity breakdown
+  console.log('📊 Severity Breakdown:', apiStore.severityBreakdown)
 })
 
 const displayedLogs = computed(() => paginatedResults.value)
@@ -265,6 +291,9 @@ const criticalInResults = computed(() => {
 })
 const highInResults = computed(() => {
   return apiStore.severityBreakdown.find(s => s._id === 'High')?.count || 0
+})
+const mediumInResults = computed(() => {
+  return apiStore.severityBreakdown.find(s => s._id === 'Medium')?.count || 0
 })
 const lowInResults = computed(() => {
   return apiStore.severityBreakdown.find(s => s._id === 'Low')?.count || 0
@@ -283,7 +312,7 @@ const toggleLogExpanded = (idx) => {
 }
 
 const formatTime = (timestamp) => {
-  return new Date(timestamp).toLocaleString()
+  return formatTimestamp(timestamp, 'datetime')
 }
 
 const getSeverityClass = (severity) => {
