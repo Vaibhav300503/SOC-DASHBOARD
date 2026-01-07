@@ -153,10 +153,6 @@
         <div class="stat-value text-neon-red">{{ criticalIPs }}</div>
         <div class="stat-label">Critical IPs</div>
       </div>
-      <div class="stat-card card-accent-orange text-center-left">
-        <div class="stat-value text-neon-orange">{{ avgAlertsPerIP }}</div>
-        <div class="stat-label">Avg Alerts/IP</div>
-      </div>
       <div class="stat-card card-accent-green text-center-left">
         <div class="stat-value text-neon-green text-sm font-mono truncate">{{ topIP.ip || 'N/A' }}</div>
         <div class="stat-label">Most Active IP</div>

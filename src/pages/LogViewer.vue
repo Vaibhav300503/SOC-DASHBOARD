@@ -17,6 +17,7 @@
             :value="searchQuery"
             @input="performSearch($event.target.value)"
             type="text"
+            autocomplete="off"
             placeholder="Search by IP, endpoint, timestamp, or any field..."
             class="input-cyber w-full"
           />
@@ -75,18 +76,7 @@
           </div>
         </div>
 
-        <div class="flex gap-2 items-center">
-          <label class="flex items-center gap-2 text-sm text-slate-dark-300">
-            <input v-model="useRegex" type="checkbox" class="w-4 h-4 rounded" />
-            Use Regex
-          </label>
-          <button @click="clearSearch" class="btn-cyber-outline text-sm">
-            <i class="fas fa-times mr-1"></i>Clear
-          </button>
-          <button class="btn-cyber-outline text-sm">
-            <i class="fas fa-sliders-h mr-1"></i>Advanced
-          </button>
-        </div>
+
       </div>
     </div>
 
@@ -272,7 +262,6 @@ const isCopying = ref(false)
 const isCopyingIndividual = ref(null)
 const copyButtonState = ref('idle')
 const copiedIndividualId = ref(null)
-const useRegex = ref(false)
 
 onMounted(async () => {
   await fetchData() // Trigger server-side fetch

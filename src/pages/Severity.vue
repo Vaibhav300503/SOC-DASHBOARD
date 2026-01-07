@@ -73,6 +73,7 @@
         <div>
           <label class="block text-sm font-medium text-slate-dark-300 mb-2">Time Range</label>
           <select v-model="filterTimeRange" class="input-cyber w-full">
+            <option value="all">All Time</option>
             <option value="24h">Last 24 Hours</option>
             <option value="7d">Last 7 Days</option>
             <option value="30d">Last 30 Days</option>
@@ -517,7 +518,7 @@ const authStore = useAuthStore()
 const { addToast } = useToast()
 const selectedSeverity = ref('Critical')
 const filterLogType = ref('')
-const filterTimeRange = ref('24h')
+const filterTimeRange = ref('all')
 const filterSourceIP = ref('')
 const activeMenuId = ref(null)
 const activeLog = ref(null)

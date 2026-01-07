@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "Backend for SOC Dashboard - Log ingestion and API",
   "main": "server.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
-    "start": "node -r dotenv/config server.js",
-    "dev": "nodemon -r dotenv/config server.js",
+    "start": "node --experimental-modules server.js",
+    "dev": "nodemon server.js",
     "test": "jest"
   },
   "dependencies": {

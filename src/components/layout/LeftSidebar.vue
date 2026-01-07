@@ -60,15 +60,15 @@
         <div class="px-3 py-2 border-b border-card-border-default">
           <div class="grid grid-cols-3 gap-2 text-center">
             <div>
-              <div class="text-xs font-bold text-accent-primary">24</div>
+              <div class="text-xs font-bold text-accent-primary">{{ userStore.stats?.loginCount || 0 }}</div>
               <div class="text-xs text-text-muted">Logins</div>
             </div>
             <div>
-              <div class="text-xs font-bold text-green-500">12</div>
+              <div class="text-xs font-bold text-green-500">{{ userStore.stats?.alertsCreated || 0 }}</div>
               <div class="text-xs text-text-muted">Alerts</div>
             </div>
             <div>
-              <div class="text-xs font-bold text-purple-400">8</div>
+              <div class="text-xs font-bold text-purple-400">{{ userStore.stats?.reportsGenerated || 0 }}</div>
               <div class="text-xs text-text-muted">Reports</div>
             </div>
           </div>
@@ -117,15 +117,28 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/authStore'
 import { useSidebarStore } from '../../stores/sidebarStore'
+import { useUserStore } from '../../stores/userStore'
 import SidebarNavigation from './SidebarNavigation.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const sidebarStore = useSidebarStore()
+const userStore = useUserStore()
+
+onMounted(async () => {
+  // Ensure user data is loaded for first name
+  if (!userStore.user) {
+    await userStore.initializeUser()
+  }
+  // Ensure stats are loaded
+  if (!userStore.stats) {
+    await userStore.loadStats()
+  }
+})
 
 const isCollapsed = computed({
   get: () => sidebarStore.isCollapsed,
@@ -134,7 +147,11 @@ const isCollapsed = computed({
 
 const showUserMenu = ref(false)
 
-const userName = computed(() => authStore.user?.name || 'User')
+const userName = computed(() => {
+  if (userStore.user?.firstName) return userStore.user.firstName
+  if (authStore.user?.name) return authStore.user.name.split(' ')[0]
+  return 'User'
+})
 const userRole = computed(() => authStore.user?.role || 'Analyst')
 
 const toggleSidebar = () => {

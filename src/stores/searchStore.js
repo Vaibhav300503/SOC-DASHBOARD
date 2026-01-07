@@ -13,7 +13,7 @@ export const useSearchStore = defineStore('search', () => {
   // ============================================
   // SEARCH STATE (Single Source of Truth)
   // ============================================
-  
+
   const searchQuery = ref('')
   const filters = ref({
     severity: '',
@@ -26,19 +26,19 @@ export const useSearchStore = defineStore('search', () => {
     country: '',
     city: ''
   })
-  
+
   const pagination = ref({
     page: 1,
     limit: 50
   })
-  
+
   const isLoading = ref(false)
   const error = ref(null)
-  
+
   // ============================================
   // ACTIONS
   // ============================================
-  
+
   /**
    * Set search query
    * CRITICAL: This is the ONLY way to set search query
@@ -48,7 +48,7 @@ export const useSearchStore = defineStore('search', () => {
     // Reset to page 1 when search changes
     pagination.value.page = 1
   }
-  
+
   /**
    * Set individual filter
    * CRITICAL: Use this for all filter changes
@@ -60,7 +60,7 @@ export const useSearchStore = defineStore('search', () => {
       pagination.value.page = 1
     }
   }
-  
+
   /**
    * Set multiple filters at once
    */
@@ -72,7 +72,7 @@ export const useSearchStore = defineStore('search', () => {
     })
     pagination.value.page = 1
   }
-  
+
   /**
    * Clear all search and filters
    */
@@ -92,45 +92,45 @@ export const useSearchStore = defineStore('search', () => {
     pagination.value.page = 1
     error.value = null
   }
-  
+
   /**
    * Set pagination
    */
   const setPage = (page) => {
     pagination.value.page = Math.max(1, page)
   }
-  
+
   const setLimit = (limit) => {
     pagination.value.limit = Math.max(10, Math.min(100, limit))
     pagination.value.page = 1
   }
-  
+
   /**
    * Set loading state
    */
   const setLoading = (loading) => {
     isLoading.value = loading
   }
-  
+
   /**
    * Set error
    */
   const setError = (err) => {
     error.value = err
   }
-  
+
   // ============================================
   // COMPUTED PROPERTIES
   // ============================================
-  
+
   /**
    * Check if any filters are active
    */
   const hasActiveFilters = computed(() => {
     return searchQuery.value.length > 0 ||
-           Object.values(filters.value).some(v => v && v !== '7d') // Changed from '24h' to '7d'
+      Object.values(filters.value).some(v => v && v !== '7d') // Changed from '24h' to '7d'
   })
-  
+
   /**
    * Get active filter count
    */
@@ -145,14 +145,14 @@ export const useSearchStore = defineStore('search', () => {
     })
     return count
   })
-  
+
   /**
    * Get pagination offset
    */
   const offset = computed(() => {
     return (pagination.value.page - 1) * pagination.value.limit
   })
-  
+
   return {
     // State
     searchQuery,
@@ -160,7 +160,7 @@ export const useSearchStore = defineStore('search', () => {
     pagination,
     isLoading,
     error,
-    
+
     // Actions
     setSearchQuery,
     setFilter,
@@ -170,7 +170,7 @@ export const useSearchStore = defineStore('search', () => {
     setLimit,
     setLoading,
     setError,
-    
+
     // Computed
     hasActiveFilters,
     activeFilterCount,

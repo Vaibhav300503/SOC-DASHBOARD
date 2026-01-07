@@ -10,17 +10,17 @@ export const setupInterceptors = () => {
     (config) => {
       // Get fresh auth store instance for each request
       const authStore = useAuthStore()
-      
+
       // Check if we're in demo mode
       const demoMode = localStorage.getItem('demoMode') === 'true'
-      
+
       if (demoMode && authStore.user) {
         // For demo mode, create a simple token from user data
-        const demoToken = btoa(JSON.stringify({ 
-          userId: authStore.user._id, 
+        const demoToken = btoa(JSON.stringify({
+          userId: authStore.user._id,
           email: authStore.user.email,
           role: authStore.user.role,
-          demo: true 
+          demo: true
         }))
         config.headers.Authorization = `Bearer ${demoToken}`
         console.log('Demo mode: Using demo token for request:', config.url)
@@ -31,7 +31,7 @@ export const setupInterceptors = () => {
       } else {
         console.warn('No token available for request to:', config.url)
       }
-      
+
       return config
     },
     (error) => {
@@ -91,11 +91,27 @@ export const setupInterceptors = () => {
 
       // If unauthorized and not a retry, logout (but not in demo mode)
       if (error.response?.status === 401 && !originalRequest._retry && !demoMode) {
-        console.error('Unauthorized access, logging out')
-        await authStore.logout()
-        // Only redirect if not on login page
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login'
+        const errorCode = error.response?.data?.code
+
+        // List of error codes that definitively require logout
+        const fatalAuthErrors = [
+          'TOKEN_INVALID',
+          'TOKEN_EXPIRED',
+          'TOKEN_MISSING',
+          'AUTH_REQUIRED',
+          'TOKEN_MALFORMED'
+        ]
+
+        // Only logout if it's a known fatal auth error, or if we have no error code (generic 401)
+        if (!errorCode || fatalAuthErrors.includes(errorCode)) {
+          console.error('Unauthorized access (Fatal), logging out. Code:', errorCode)
+          await authStore.logout()
+          // Only redirect if not on login page
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login'
+          }
+        } else {
+          console.warn('Received 401 but not treating as fatal logout. Code:', errorCode)
         }
       }
 

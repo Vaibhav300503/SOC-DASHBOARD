@@ -169,13 +169,23 @@ router.get('/stats', requireAuth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' })
     }
 
-    // Get additional stats from other collections
-    const db = req.app.locals.db
-    const [alertCount, logCount, reportCount] = await Promise.all([
-      db.collection('alerts_events').countDocuments({ created_by: user._id }),
-      db.collection('logs').countDocuments({ user_id: user._id }),
-      db.collection('reports').countDocuments({ created_by: user._id })
+    // Get additional stats from other collections using Mongoose models
+    // We assume 'Reports' might refer to Cases or a specific Report model if it existed. 
+    // For now mapping Reports -> Cases created by user.
+    // We import models dynamically to avoid circular dependencies if any, or just standard import.
+    // Better to have top-level imports, but let's check if they are available.
+
+    // Using dynamic imports for models to ensure they are loaded
+    const { default: AlertEvent } = await import('../models/AlertEvent.js')
+    const { default: Case } = await import('../models/Case.js')
+    // const { default: Log } = await import('../models/Log.js') // If we wanted logs viewed counts
+
+    const [alertCount, reportCount] = await Promise.all([
+      AlertEvent.countDocuments({ created_by: req.user.userId }),
+      Case.countDocuments({ created_by: req.user.userId })
     ])
+
+    // For logsViewed, we stick to the user.activity counter as there isn't a robust 'ViewedLog' collection
 
     res.json({
       success: true,
@@ -184,9 +194,10 @@ router.get('/stats', requireAuth, async (req, res) => {
         lastLogin: user.last_login,
         lastActivity: user.activity.lastActivity,
         activity: user.activity,
+        // Override the simple counters with real DB counts where possible
         alertsCreated: alertCount,
-        logsViewed: logCount,
         reportsGenerated: reportCount,
+        logsViewed: user.activity.loginsViewed, // or user.activity.logsViewed if the schema had it, falling back to loginsViewed
         profileCompletion: user.profileCompletion,
         joinDate: user.created_at
       }

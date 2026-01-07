@@ -329,8 +329,8 @@
             <div class="rounded-xl border border-slate-700/30 backdrop-blur-sm p-4 bg-gradient-to-br from-slate-800/40 to-slate-900/40 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 group/card relative overflow-hidden">
               <div class="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/10 to-slate-600/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300"></div>
               <div class="relative z-10">
-                <div class="text-xs text-slate-400 uppercase tracking-wide mb-2 font-medium">Timestamp</div>
-                <div class="text-sm text-slate-300">{{ formatFullTime(selectedLog.timestamp) }}</div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-2 font-medium">Log Type</div>
+                <div class="text-sm font-semibold text-cyan-400">{{ selectedLog.log_type || 'Unknown' }}</div>
               </div>
             </div>
           </div>
@@ -645,13 +645,13 @@ const fetchLogs = async (reset = false) => {
       // Update store for compatibility (though we maintain local state now)
       apiStore.logs = logs.value
       
+      // Update total count from API
+      totalCount.value = response.total || logs.value.length
+
       hasMore.value = response.hasMore || (logs.value.length < response.total)
       
       if (reset) {
-         addToast({
-          type: 'success',
-          message: `Found ${response.total} logs matching your filters`
-        })
+
       }
     }
   } catch (error) {
@@ -678,17 +678,21 @@ const loadMore = () => {
 
 // Update filteredLogs computed to just return our local server-fetched logs
 // We no longer filter locally for the main list
+const totalCount = ref(0) // Store total count from API
+
+// Update filteredLogs computed to just return our local server-fetched logs
+// We no longer filter locally for the main list
 const filteredLogs = computed(() => logs.value)
 
-// Counts need to be updated to rely on Dashboard stats or separate API call 
-// because we don't have all logs client-side anymore.
-// For now, we can only count what is visible, OR we should hide these counts if they are not accurate.
-// BETTER: Use the dashboard stats we fetched which contains severity breakdown.
-const criticalCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'Critical')?.count || 0)
-const highCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'High')?.count || 0)
-const mediumCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'Medium')?.count || 0)
-const lowCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'Low')?.count || 0)
-const totalFilteredCount = computed(() => apiStore.totalLogs)
+// Counts are now calculated from the currently fetched (filtered) logs for distribution
+// This ensures they update when the user changes filters (e.g., Log Type, Time Range)
+const criticalCount = computed(() => logs.value.filter(l => (l.severity || '').toLowerCase() === 'critical').length)
+const highCount = computed(() => logs.value.filter(l => (l.severity || '').toLowerCase() === 'high').length)
+const mediumCount = computed(() => logs.value.filter(l => (l.severity || '').toLowerCase() === 'medium').length)
+const lowCount = computed(() => logs.value.filter(l => (l.severity || '').toLowerCase() === 'low').length)
+
+// Use the total count from the API response for the main counter
+const totalFilteredCount = computed(() => totalCount.value)
 
 
 const severityDistribution = computed(() => [

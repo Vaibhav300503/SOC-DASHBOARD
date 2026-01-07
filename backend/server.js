@@ -17,6 +17,7 @@ dotenv.config()
 const app = express()
 const server = createServer(app)
 const PORT = process.env.PORT || 3001
+const API_PREFIX = '/api'
 
 // Import database connection
 import connectDB from './config/db.js';
@@ -131,7 +132,7 @@ app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     // List of allowed origins
     const allowedOrigins = [
       'http://localhost:3000',
@@ -156,11 +157,11 @@ app.use(cors({
       'http://100.108.227.68:3001',
       'http://100.108.227.68:3002'
     ];
-    
+
     // Check if origin matches allowed list or matches Tailscale pattern
     const isTailscaleIP = /^http:\/\/100\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(origin);
     const isAllowed = allowedOrigins.includes(origin) || isTailscaleIP;
-    
+
     if (isAllowed) {
       callback(null, true);
     } else {
@@ -178,13 +179,14 @@ app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }))
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const staticRavenPath = path.resolve(__dirname, '..', 'raven-main')
-app.use('/raven-main', express.static(staticRavenPath))
+
 
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: 5000, // limit each IP to 5000 requests per windowMs (relaxed for dashboard polling)
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 })
 app.use('/api/', limiter)
 
@@ -214,9 +216,9 @@ app.get('/api/test/db', async (req, res) => {
 // API Routes
 app.use('/api/', (req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
-  console.log('Request headers:', req.headers);
+  // console.log('Request headers:', req.headers); // Reduce noise
   next();
-}, limiter)
+})
 
 // Define routes
 

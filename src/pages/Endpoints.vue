@@ -109,10 +109,6 @@
         <div class="stat-value text-neon-red">{{ criticalEndpoints }}</div>
         <div class="stat-label">Critical Endpoints</div>
       </div>
-      <div class="stat-card card-accent-orange text-center-left">
-        <div class="stat-value text-neon-orange">{{ avgErrorRate }}%</div>
-        <div class="stat-label">Avg Error Rate</div>
-      </div>
       <div class="stat-card card-accent-green text-center-left">
         <div class="stat-value text-neon-green text-lg truncate">{{ mostActiveEndpoint }}</div>
         <div class="stat-label">Most Active</div>
@@ -145,7 +141,12 @@
                 <th>Endpoint</th>
                 <th>Total Events</th>
                 <th>Critical</th>
-                <th>Error Rate</th>
+                <th>
+                  Error Rate 
+                  <span title="Percentage of Critical/High severity events" class="cursor-help text-slate-dark-400 ml-1">
+                    <i class="fas fa-info-circle text-xs"></i>
+                  </span>
+                </th>
                 <th>Last Activity</th>
               </tr>
             </thead>
@@ -367,7 +368,7 @@ const getEndpointCount = (endpoint) => {
 }
 
 const viewEndpointDetails = (endpointName) => {
-  const endpointData = aggregatedEndpoints.value.find(ep => ep.endpoint === endpointName)
+  const endpointData = aggregatedEndpoints.value.find(ep => (ep.endpoint_name || ep.endpoint) === endpointName)
   if (endpointData) {
     addToast(`Viewing details for ${endpointName} (${endpointData.total_count} logs)`, 'info')
     console.log(`Endpoint ${endpointName} data:`, endpointData)
@@ -381,21 +382,21 @@ const uniqueEndpoints = computed(() => {
 })
 
 const criticalEndpoints = computed(() => {
-  return aggregatedEndpoints.value.filter(ep => ep.critical_count > 0).length
+  return aggregatedEndpoints.value.filter(ep => (ep.criticalCount || 0) > 0).length
 })
 
 const avgErrorRate = computed(() => {
   if (!aggregatedEndpoints.value || aggregatedEndpoints.value.length === 0) return '0.0'
-  const totalEvents = aggregatedEndpoints.value.reduce((sum, ep) => sum + (ep.total_count || 0), 0)
-  const totalErrors = aggregatedEndpoints.value.reduce((sum, ep) => sum + (ep.error_count || 0), 0)
+  const totalEvents = aggregatedEndpoints.value.reduce((sum, ep) => sum + (ep.eventCount || 0), 0)
+  const totalErrors = aggregatedEndpoints.value.reduce((sum, ep) => sum + (ep.criticalCount || 0), 0)
   if (totalEvents === 0) return '0.0'
   return ((totalErrors / totalEvents) * 100).toFixed(1)
 })
 
 const mostActiveEndpoint = computed(() => {
   if (!aggregatedEndpoints.value || aggregatedEndpoints.value.length === 0) return 'N/A'
-  const sorted = [...aggregatedEndpoints.value].sort((a, b) => (b.total_count || 0) - (a.total_count || 0))
-  return sorted.length > 0 ? sorted[0].endpoint : 'N/A'
+  const sorted = [...aggregatedEndpoints.value].sort((a, b) => (b.eventCount || 0) - (a.eventCount || 0))
+  return sorted.length > 0 ? (sorted[0].endpoint_name || sorted[0].endpoint) : 'N/A'
 })
 
 const topAttackingIPs = computed(() => {
@@ -432,11 +433,11 @@ const topAttackingIPs = computed(() => {
 const endpointList = computed(() => {
   // Map aggregated endpoint data to display format
   return aggregatedEndpoints.value.map(ep => ({
-    name: ep.endpoint || 'Unknown',
-    totalEvents: ep.total_count || 0,
-    critical: ep.critical_count || 0,
-    errorRate: ep.total_count > 0 ? ((ep.error_count || 0) / ep.total_count * 100).toFixed(1) : '0.0',
-    lastActivity: ep.last_timestamp ? formatTimestamp(ep.last_timestamp, 'time') : 'N/A',
+    name: ep.endpoint_name || ep._id || ep.endpoint || 'Unknown',
+    totalEvents: ep.eventCount || 0,
+    critical: ep.criticalCount || 0,
+    errorRate: (ep.eventCount > 0) ? (((ep.criticalCount || 0) / ep.eventCount) * 100).toFixed(1) : '0.0',
+    lastActivity: ep.last_seen ? formatTimestamp(ep.last_seen, 'datetime') : 'N/A',
     status: 'Active',
   }))
 })
@@ -449,7 +450,7 @@ const recentLogs = computed(() => {
 
 // Get all unique endpoints for suggestions
 const allEndpoints = computed(() => {
-  return aggregatedEndpoints.value.map(ep => ep.endpoint).sort()
+  return aggregatedEndpoints.value.map(ep => ep.endpoint_name || ep.endpoint).filter(Boolean).sort()
 })
 
 // Filter suggestions based on search input

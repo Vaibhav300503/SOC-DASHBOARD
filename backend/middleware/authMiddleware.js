@@ -4,7 +4,7 @@ import secureLogger from './secureLogger.js';
 
 class AuthMiddleware {
   constructor() {
-    this.JWT_SECRET = secureConfig.JWT_SECRET;
+    this.JWT_SECRET = process.env.JWT_SECRET;
     this.bypassAuth = process.env.NODE_ENV === 'development' && process.env.BYPASS_AUTH === 'true';
     console.log('AuthMiddleware: NODE_ENV=', process.env.NODE_ENV);
     console.log('AuthMiddleware: BYPASS_AUTH=', process.env.BYPASS_AUTH);
@@ -13,17 +13,17 @@ class AuthMiddleware {
 
   // JWT verification middleware
   verifyToken(req, res, next) {
-    console.log('verifyToken called for:', req.originalUrl);
-    console.log('bypassAuth:', this.bypassAuth);
+    // console.log('verifyToken called for:', req.originalUrl); // Reduce noise
+
     // Bypass authentication in development if explicitly allowed
     if (this.bypassAuth) {
       console.log('Bypassing authentication for:', req.originalUrl);
-      req.user = { id: 'dev-user', role: 'admin' };
+      req.user = { id: 'dev-user', userId: 'dev-user', role: 'admin' };
       return next();
     }
 
     const token = this.extractToken(req);
-    
+
     if (!token) {
       secureLogger.logSecurityEvent('Unauthorized access attempt - No token', {
         ip: req.ip,
@@ -31,7 +31,7 @@ class AuthMiddleware {
         method: req.method,
         userAgent: req.get('User-Agent')
       });
-      
+
       return res.status(401).json({
         error: 'Access token required',
         code: 'TOKEN_MISSING'
@@ -39,35 +39,42 @@ class AuthMiddleware {
     }
 
     try {
-      const decoded = jwt.verify(token, this.JWT_SECRET);
-      
-      // Validate token structure
-      if (!decoded.id || !decoded.role) {
-        throw new Error('Invalid token structure');
+      if (!this.JWT_SECRET) {
+        throw new Error('JWT_SECRET is not defined in environment');
       }
-      
-      // Add user info to request
+
+      const decoded = jwt.verify(token, this.JWT_SECRET);
+      console.log('JWT Decoded Payload:', JSON.stringify(decoded)); // Logical confirmation
+
+      // Normalize ID (handle mismatch between 'id' and 'userId')
+      const userId = decoded.id || decoded.userId;
+
+      // Validate token structure
+      if (!userId || !decoded.role) {
+        console.error('Invalid token structure:', decoded);
+        throw new Error('Invalid token structure: missing id/userId or role');
+      }
+
+      // Add user info to request (populate BOTH id and userId to be safe)
       req.user = {
-        id: decoded.id,
+        id: userId,
+        userId: userId,
         email: decoded.email,
         role: decoded.role,
         permissions: decoded.permissions || []
       };
-      
-      // Log successful authentication
-      secureLogger.info('User authenticated', {
-        userId: req.user.id,
-        role: req.user.role,
-        ip: req.ip,
-        url: req.originalUrl
-      });
-      
+
+      // Log successful authentication (debug level)
+      // console.log('User authenticated:', req.user.email);
+
       next();
-      
+
     } catch (error) {
+      console.error('JWT Verification Error:', error.message);
+
       let errorMessage = 'Invalid token';
       let errorCode = 'TOKEN_INVALID';
-      
+
       if (error.name === 'TokenExpiredError') {
         errorMessage = 'Token expired';
         errorCode = 'TOKEN_EXPIRED';
@@ -75,7 +82,7 @@ class AuthMiddleware {
         errorMessage = 'Malformed token';
         errorCode = 'TOKEN_MALFORMED';
       }
-      
+
       secureLogger.logSecurityEvent(`Unauthorized access attempt - ${errorMessage}`, {
         ip: req.ip,
         url: req.originalUrl,
@@ -84,7 +91,7 @@ class AuthMiddleware {
         errorCode,
         tokenPreview: token.substring(0, 20) + '...'
       });
-      
+
       return res.status(401).json({
         error: errorMessage,
         code: errorCode
@@ -103,17 +110,17 @@ class AuthMiddleware {
       }
 
       const userRole = req.user.role;
-      
+
       // Role hierarchy: admin > analyst > viewer
       const roleHierarchy = {
         'viewer': 1,
         'analyst': 2,
         'admin': 3
       };
-      
+
       const userRoleLevel = roleHierarchy[userRole] || 0;
       const requiredRoleLevel = roleHierarchy[requiredRole] || 0;
-      
+
       if (userRoleLevel < requiredRoleLevel) {
         secureLogger.logSecurityEvent('Insufficient permissions', {
           userId: req.user.id,
@@ -122,7 +129,7 @@ class AuthMiddleware {
           ip: req.ip,
           url: req.originalUrl
         });
-        
+
         return res.status(403).json({
           error: 'Insufficient permissions',
           code: 'INSUFFICIENT_PERMISSIONS',
@@ -130,7 +137,7 @@ class AuthMiddleware {
           current: userRole
         });
       }
-      
+
       next();
     };
   }
@@ -146,7 +153,7 @@ class AuthMiddleware {
       }
 
       const userPermissions = req.user.permissions || [];
-      
+
       if (!userPermissions.includes(permission)) {
         secureLogger.logSecurityEvent('Permission denied', {
           userId: req.user.id,
@@ -155,14 +162,14 @@ class AuthMiddleware {
           ip: req.ip,
           url: req.originalUrl
         });
-        
+
         return res.status(403).json({
           error: 'Permission denied',
           code: 'PERMISSION_DENIED',
           required: permission
         });
       }
-      
+
       next();
     };
   }
@@ -174,17 +181,17 @@ class AuthMiddleware {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       return authHeader.substring(7);
     }
-    
+
     // Try query parameter (for WebSocket connections)
     if (req.query && req.query.token) {
       return req.query.token;
     }
-    
+
     // Try cookie
     if (req.cookies && req.cookies.token) {
       return req.cookies.token;
     }
-    
+
     return null;
   }
 
@@ -192,22 +199,22 @@ class AuthMiddleware {
   authenticateWebSocket(socket, next) {
     try {
       // Extract token from WebSocket query or handshake
-      const token = socket.handshake.query.token || 
-                    socket.handshake.auth.token ||
-                    this.extractTokenFromHeaders(socket.handshake.headers);
-      
+      const token = socket.handshake.query.token ||
+        socket.handshake.auth.token ||
+        this.extractTokenFromHeaders(socket.handshake.headers);
+
       if (!token) {
         secureLogger.logSecurityEvent('WebSocket connection rejected - No token', {
           ip: socket.handshake.address,
           userAgent: socket.handshake.headers['user-agent']
         });
-        
+
         return next(new Error('Authentication required'));
       }
 
       // Verify JWT
       const decoded = jwt.verify(token, this.JWT_SECRET);
-      
+
       // Add user info to socket
       socket.user = {
         id: decoded.id,
@@ -215,22 +222,22 @@ class AuthMiddleware {
         role: decoded.role,
         permissions: decoded.permissions || []
       };
-      
+
       secureLogger.info('WebSocket authenticated', {
         userId: socket.user.id,
         role: socket.user.role,
         ip: socket.handshake.address
       });
-      
+
       next();
-      
+
     } catch (error) {
       secureLogger.logSecurityEvent('WebSocket authentication failed', {
         ip: socket.handshake.address,
         error: error.message,
         userAgent: socket.handshake.headers['user-agent']
       });
-      
+
       next(new Error('Authentication failed'));
     }
   }
@@ -251,13 +258,13 @@ class AuthMiddleware {
       role: user.role,
       permissions: user.permissions || []
     };
-    
+
     const options = {
       expiresIn: process.env.JWT_EXPIRES_IN || '24h',
       issuer: 'soc-dashboard',
       audience: 'soc-dashboard'
     };
-    
+
     return jwt.sign(payload, this.JWT_SECRET, options);
   }
 
@@ -265,15 +272,15 @@ class AuthMiddleware {
   refreshToken(token) {
     try {
       const decoded = jwt.verify(token, this.JWT_SECRET, { ignoreExpiration: true });
-      
+
       // Check if token is not too old (max 7 days)
       const tokenAge = Date.now() - (decoded.iat * 1000);
       const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
-      
+
       if (tokenAge > maxAge) {
         throw new Error('Token too old for refresh');
       }
-      
+
       // Generate new token with same payload
       const newPayload = {
         id: decoded.id,
@@ -281,13 +288,13 @@ class AuthMiddleware {
         role: decoded.role,
         permissions: decoded.permissions || []
       };
-      
+
       return jwt.sign(newPayload, this.JWT_SECRET, {
         expiresIn: process.env.JWT_EXPIRES_IN || '24h',
         issuer: 'soc-dashboard',
         audience: 'soc-dashboard'
       });
-      
+
     } catch (error) {
       throw new Error('Token refresh failed');
     }
