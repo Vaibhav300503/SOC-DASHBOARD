@@ -62,7 +62,7 @@ router.get('/logs', async (req, res) => {
     const ipArray = Array.from(ips)
     const geoDataMap = new Map()
     const enrichedGeo = await enrichIPsBatch(ipArray)
-    
+
     enrichedGeo.forEach((geo, idx) => {
       geoDataMap.set(ipArray[idx], geo)
     })
@@ -287,6 +287,73 @@ router.post('/batch', async (req, res) => {
       success: false,
       error: error.message
     })
+  }
+})
+
+/**
+ * GET /api/geo/threats
+ * Get recent log activity as threat flows for visualization
+ */
+router.get('/threats', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50)
+
+    // Fetch recent logs that have geodata (meaning they went through enrichment)
+    const logs = await Log.find({
+      'geo.lat': { $exists: true, $ne: 0 },
+      'geo.lon': { $exists: true, $ne: 0 }
+    })
+      .sort({ timestamp: -1 })
+      .limit(limit)
+
+    if (logs.length === 0) {
+      return res.json({ success: true, data: [] })
+    }
+
+    const threats = logs.map(log => {
+      // Determine source and destination coords
+      // Default destination to Mumbai/Delhi if it's our internal network
+      const source = {
+        lat: log.geo?.lat || 0,
+        lng: log.geo?.lon || 0,
+        city: log.geo?.city || 'Unknown',
+        country: log.geo?.country || 'Unknown'
+      }
+
+      // If we have dest_ip, try to use its geo if it exists, 
+      // otherwise default to a fixed point in India (SOC HQ)
+      const destination = {
+        lat: 28.6139, // Default Delhi
+        lng: 77.2090,
+        city: 'New Delhi',
+        country: 'India'
+      }
+
+      // Map severity to color
+      const colorMap = {
+        'Critical': '#ef4444',
+        'High': '#f97316',
+        'Medium': '#eab308',
+        'Low': '#3b82f6'
+      }
+
+      return {
+        id: log._id,
+        source,
+        destination,
+        type: log.log_type || 'System',
+        color: colorMap[log.severity] || '#3b82f6',
+        timestamp: log.timestamp
+      }
+    })
+
+    res.json({
+      success: true,
+      data: threats
+    })
+  } catch (error) {
+    console.error('Error fetching geo threats:', error)
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 

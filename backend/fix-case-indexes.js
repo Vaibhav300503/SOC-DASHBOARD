@@ -1,7 +1,10 @@
 // Fix case indexes and create sample data
 import mongoose from 'mongoose'
+import dotenv from 'dotenv'
 
-const MONGODB_URI = 'mongodb://ML:MLadmin@100.68.123.13:27017/soc_platform?authSource=admin'
+dotenv.config()
+
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://ML:MLadmin@100.68.123.13:27017/soc_platform?authSource=admin'
 
 async function fixIndexes() {
   try {
@@ -11,7 +14,7 @@ async function fixIndexes() {
 
     const db = mongoose.connection.db
     const collection = db.collection('cases')
-    
+
     // Drop the problematic unique index on case_id
     try {
       await collection.dropIndex('case_id_1')
@@ -118,9 +121,9 @@ async function fixIndexes() {
     const createdCases = await collection.find({}).sort({ created_at: -1 }).toArray()
     console.log('\nCreated cases:')
     createdCases.forEach((caseItem, index) => {
-      const severityLabel = caseItem.severity === 4 ? 'Critical' : 
-                           caseItem.severity === 3 ? 'High' : 
-                           caseItem.severity === 2 ? 'Medium' : 'Low'
+      const severityLabel = caseItem.severity === 4 ? 'Critical' :
+        caseItem.severity === 3 ? 'High' :
+          caseItem.severity === 2 ? 'Medium' : 'Low'
       console.log(`${index + 1}. ${caseItem.title} (${severityLabel}) - ${caseItem.status}`)
     })
 

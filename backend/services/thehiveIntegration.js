@@ -44,11 +44,11 @@ export const createAlertFromEvent = async (alertEvent) => {
     // Convert severity to numeric value for TheHive
     const getSeverityValue = (severity) => {
       switch (severity?.toLowerCase()) {
-        case 'critical': return 3
-        case 'high': return 2
-        case 'medium': return 1
-        case 'low': return 0
-        default: return 1
+        case 'critical': return 4
+        case 'high': return 3
+        case 'medium': return 2
+        case 'low': return 1
+        default: return 2
       }
     }
 
@@ -61,13 +61,13 @@ export const createAlertFromEvent = async (alertEvent) => {
       severity: getSeverityValue(alertEvent.severity),
       tags: ['soc-dashboard'],
       artifacts: [
-        alertEvent.source_ip && { 
-          dataType: 'ip', 
+        alertEvent.source_ip && {
+          dataType: 'ip',
           data: alertEvent.source_ip,
           message: 'Source IP'
         },
-        alertEvent.dest_ip && { 
-          dataType: 'ip', 
+        alertEvent.dest_ip && {
+          dataType: 'ip',
           data: alertEvent.dest_ip,
           message: 'Destination IP'
         }
@@ -97,7 +97,7 @@ export const getRecentCases = async (limit = 20) => {
 
       const response = await client.get(path, { params })
       const hiveData = Array.isArray(response.data) ? response.data : []
-      
+
       if (hiveData.length > 0) {
         console.log(`✅ TheHive: Retrieved ${hiveData.length} cases`)
         return hiveData.map(hiveCase => ({
@@ -137,7 +137,7 @@ export const getRecentCases = async (limit = 20) => {
 
   } catch (error) {
     console.error('getRecentCases error:', error.message)
-    
+
     // Final fallback: try MongoDB even if there was an error
     try {
       const mongoCases = await Case.find()

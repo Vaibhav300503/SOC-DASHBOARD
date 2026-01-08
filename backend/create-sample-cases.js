@@ -1,8 +1,11 @@
 // Create sample cases for dashboard testing
 import mongoose from 'mongoose'
+import dotenv from 'dotenv'
 import Case from './models/Case.js'
 
-const MONGODB_URI = 'mongodb://ML:MLadmin@100.68.123.13:27017/soc_platform?authSource=admin'
+dotenv.config()
+
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://ML:MLadmin@100.68.123.13:27017/soc_platform?authSource=admin'
 
 const sampleCases = [
   {

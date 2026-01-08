@@ -58,6 +58,21 @@ export const logsAPI = {
   },
 
   /**
+   * Get recently active threats for map visualization
+   */
+  async getThreats(limit = 10) {
+    try {
+      const response = await axios.get(`${API_BASE}/geo/threats`, {
+        params: { limit }
+      })
+      return response.data
+    } catch (error) {
+      console.error('Error fetching threat flows:', error)
+      throw error
+    }
+  },
+
+  /**
    * Get logs for specific IP
    */
   async getLogsByIP(ip, timeRange = '24h', limit = 100) {

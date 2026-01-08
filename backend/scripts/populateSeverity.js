@@ -1,7 +1,10 @@
 import mongoose from 'mongoose'
+import dotenv from 'dotenv'
 import Log from '../models/Log.js'
 
-const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/soc-platform'
+dotenv.config()
+
+const mongoUri = process.env.MONGODB_URI || 'mongodb://ML:MLadmin@100.68.123.13:27017/soc_platform?authSource=admin'
 
 // Helper to assign severity based on log content
 function assignSeverity(log) {
@@ -11,29 +14,29 @@ function assignSeverity(log) {
   const rawMsg = (log.raw_data?.message || log.raw_data?.description || '').toLowerCase()
 
   // Check for critical patterns
-  if (logSource.includes('critical') || logSource.includes('alert') || 
-      logSource.includes('emergency') || logSource.includes('severe') ||
-      logSource.includes('attack') || logSource.includes('breach') ||
-      rawMsg.includes('critical') || rawMsg.includes('attack') ||
-      rawMsg.includes('breach') || rawMsg.includes('malicious')) {
+  if (logSource.includes('critical') || logSource.includes('alert') ||
+    logSource.includes('emergency') || logSource.includes('severe') ||
+    logSource.includes('attack') || logSource.includes('breach') ||
+    rawMsg.includes('critical') || rawMsg.includes('attack') ||
+    rawMsg.includes('breach') || rawMsg.includes('malicious')) {
     return 'Critical'
   }
 
   // Check for high patterns
-  if (logSource.includes('security') || logSource.includes('intrusion') || 
-      logSource.includes('malware') || logSource.includes('warning') ||
-      logType.includes('security') || logType.includes('firewall') ||
-      rawMsg.includes('security') || rawMsg.includes('intrusion') ||
-      rawMsg.includes('malware') || rawMsg.includes('unauthorized')) {
+  if (logSource.includes('security') || logSource.includes('intrusion') ||
+    logSource.includes('malware') || logSource.includes('warning') ||
+    logType.includes('security') || logType.includes('firewall') ||
+    rawMsg.includes('security') || rawMsg.includes('intrusion') ||
+    rawMsg.includes('malware') || rawMsg.includes('unauthorized')) {
     return 'High'
   }
 
   // Check for medium patterns
-  if (logSource.includes('error') || logSource.includes('fail') || 
-      logSource.includes('medium') || logSource.includes('kernel') ||
-      logType.includes('error') || logType.includes('fail') ||
-      rawMsg.includes('error') || rawMsg.includes('failed') ||
-      rawMsg.includes('failure')) {
+  if (logSource.includes('error') || logSource.includes('fail') ||
+    logSource.includes('medium') || logSource.includes('kernel') ||
+    logType.includes('error') || logType.includes('fail') ||
+    rawMsg.includes('error') || rawMsg.includes('failed') ||
+    rawMsg.includes('failure')) {
     return 'Medium'
   }
 
@@ -67,7 +70,7 @@ async function populateSeverity() {
 
       batch.forEach(log => {
         const newSeverity = assignSeverity(log)
-        
+
         // Only update if severity is missing or different
         if (!log.severity || log.severity !== newSeverity) {
           operations.push({

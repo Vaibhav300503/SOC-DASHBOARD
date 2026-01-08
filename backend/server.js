@@ -208,7 +208,7 @@ app.get('/api/test/db', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: error.message,
-      connectionString: 'mongodb://ML:MLadmin@100.68.123.13:27017/soc_platform?authSource=admin'
+      connectionString: (process.env.MONGODB_URI || 'mongodb://ML:MLadmin@100.68.123.13:27017/soc_platform?authSource=admin').replace(/\/\/.*@/, '//***:***@')
     });
   }
 });

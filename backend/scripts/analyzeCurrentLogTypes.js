@@ -23,7 +23,7 @@ console.log('🚀 Starting log type analysis...');
 console.log('📁 Script directory:', __dirname);
 
 // MongoDB connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/soc_platform';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://ML:MLadmin@100.68.123.13:27017/soc_platform?authSource=admin';
 console.log('🔗 MongoDB URI:', MONGODB_URI.replace(/\/\/.*@/, '//***:***@')); // Hide credentials
 
 async function connectToDatabase() {
@@ -40,16 +40,16 @@ async function connectToDatabase() {
 
 async function analyzeLogTypes() {
   console.log('🔍 ANALYZING LOG TYPES IN MONGODB');
-  console.log('=' .repeat(60));
-  
+  console.log('='.repeat(60));
+
   try {
     const db = mongoose.connection.db;
     const collection = db.collection('raw_logs');
-    
+
     // Get total count
     const totalLogs = await collection.countDocuments();
     console.log(`📊 Total logs in collection: ${totalLogs.toLocaleString()}`);
-    
+
     // Analyze log types from metadata.log_source
     console.log('\n🔍 Analyzing metadata.log_source field...');
     const logSourceAggregation = await collection.aggregate([
@@ -61,9 +61,9 @@ async function analyzeLogTypes() {
       },
       { $sort: { count: -1 } }
     ]).toArray();
-    
+
     console.log(`📊 Found ${logSourceAggregation.length} unique log sources`);
-    
+
     // Analyze log types from log_type field
     console.log('\n🔍 Analyzing log_type field...');
     const logTypeAggregation = await collection.aggregate([
@@ -75,9 +75,9 @@ async function analyzeLogTypes() {
       },
       { $sort: { count: -1 } }
     ]).toArray();
-    
+
     console.log(`📊 Found ${logTypeAggregation.length} unique log_type values`);
-    
+
     // Analyze raw_data.log_source
     console.log('\n🔍 Analyzing raw_data.log_source field...');
     const rawDataLogSourceAggregation = await collection.aggregate([
@@ -89,13 +89,13 @@ async function analyzeLogTypes() {
       },
       { $sort: { count: -1 } }
     ]).toArray();
-    
+
     console.log(`📊 Found ${rawDataLogSourceAggregation.length} unique raw_data.log_source values`);
-    
+
     // Get sample documents to understand structure
     console.log('\n🔍 Analyzing document structure...');
     const sampleDocs = await collection.find({}).limit(10).toArray();
-    
+
     const fieldAnalysis = {
       hasMetadataLogSource: 0,
       hasLogType: 0,
@@ -103,20 +103,20 @@ async function analyzeLogTypes() {
       hasRawDataType: 0,
       totalSampled: sampleDocs.length
     };
-    
+
     sampleDocs.forEach(doc => {
       if (doc.metadata?.log_source) fieldAnalysis.hasMetadataLogSource++;
       if (doc.log_type) fieldAnalysis.hasLogType++;
       if (doc.raw_data?.log_source) fieldAnalysis.hasRawDataLogSource++;
       if (doc.raw_data?.type) fieldAnalysis.hasRawDataType++;
     });
-    
+
     console.log('📊 Field presence in sample:');
     console.log(`   metadata.log_source: ${fieldAnalysis.hasMetadataLogSource}/${fieldAnalysis.totalSampled}`);
     console.log(`   log_type: ${fieldAnalysis.hasLogType}/${fieldAnalysis.totalSampled}`);
     console.log(`   raw_data.log_source: ${fieldAnalysis.hasRawDataLogSource}/${fieldAnalysis.totalSampled}`);
     console.log(`   raw_data.type: ${fieldAnalysis.hasRawDataType}/${fieldAnalysis.totalSampled}`);
-    
+
     // Prepare analysis results
     const analysisResults = {
       timestamp: new Date().toISOString(),
@@ -146,36 +146,36 @@ async function analyzeLogTypes() {
         timestamp: doc.timestamp
       }))
     };
-    
+
     // Save results to JSON file
     const outputDir = path.join(__dirname, '../../docs');
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
-    
+
     const jsonOutputPath = path.join(outputDir, 'log-type-analysis-results.json');
     fs.writeFileSync(jsonOutputPath, JSON.stringify(analysisResults, null, 2));
     console.log(`\n💾 Results saved to: ${jsonOutputPath}`);
-    
+
     // Generate analysis report
     await generateAnalysisReport(analysisResults, outputDir);
-    
+
     // Display top 20 log sources
     console.log('\n📊 TOP 20 LOG SOURCES (metadata.log_source):');
     logSourceAggregation.slice(0, 20).forEach((item, index) => {
       const percentage = ((item.count / totalLogs) * 100).toFixed(2);
       console.log(`${(index + 1).toString().padStart(2)}: ${item._id || 'null'} - ${item.count.toLocaleString()} (${percentage}%)`);
     });
-    
+
     // Identify patterns for classification
     console.log('\n🔍 CLASSIFICATION PATTERNS IDENTIFIED:');
     const patterns = identifyClassificationPatterns(logSourceAggregation);
     patterns.forEach(pattern => {
       console.log(`📋 ${pattern.category}: ${pattern.patterns.join(', ')}`);
     });
-    
+
     return analysisResults;
-    
+
   } catch (error) {
     console.error('❌ Error analyzing log types:', error);
     throw error;
@@ -225,28 +225,28 @@ function identifyClassificationPatterns(logSourceData) {
       keywords: ['fim', 'file', 'integrity', 'ossec', 'samhain', 'aide', 'tripwire']
     }
   ];
-  
+
   // Match log sources to patterns
   logSourceData.forEach(item => {
     const logSource = (item._id || '').toLowerCase();
-    
+
     patterns.forEach(pattern => {
-      const matches = pattern.keywords.some(keyword => 
+      const matches = pattern.keywords.some(keyword =>
         logSource.includes(keyword.toLowerCase())
       );
-      
+
       if (matches && item._id) {
         pattern.patterns.push(`${item._id} (${item.count})`);
       }
     });
   });
-  
+
   return patterns.filter(pattern => pattern.patterns.length > 0);
 }
 
 async function generateAnalysisReport(results, outputDir) {
   const reportPath = path.join(outputDir, 'log-type-analysis-report.md');
-  
+
   const report = `# Log Type Analysis Report
 
 **Generated**: ${results.timestamp}
@@ -273,9 +273,9 @@ This analysis examined ${results.totalLogs.toLocaleString()} logs in the MongoDB
 | Rank | Log Source | Count | Percentage |
 |------|------------|-------|------------|
 ${results.logSourceAnalysis.distribution.slice(0, 20).map((item, index) => {
-  const percentage = ((item.count / results.totalLogs) * 100).toFixed(2);
-  return `| ${index + 1} | ${item._id || 'null'} | ${item.count.toLocaleString()} | ${percentage}% |`;
-}).join('\n')}
+    const percentage = ((item.count / results.totalLogs) * 100).toFixed(2);
+    return `| ${index + 1} | ${item._id || 'null'} | ${item.count.toLocaleString()} | ${percentage}% |`;
+  }).join('\n')}
 
 ## Classification Mapping Recommendations
 
@@ -283,27 +283,27 @@ Based on the analysis, here are the recommended mappings for the 8 standardized 
 
 ### Authentication (auth)
 - Look for: UnifiedAuth, login, authentication, logon, credential patterns
-- Estimated logs: ${results.logSourceAnalysis.distribution.filter(item => 
-  (item._id || '').toLowerCase().includes('auth') || 
-  (item._id || '').toLowerCase().includes('login') ||
-  (item._id || '').toLowerCase().includes('unified')
-).reduce((sum, item) => sum + item.count, 0).toLocaleString()}
+- Estimated logs: ${results.logSourceAnalysis.distribution.filter(item =>
+    (item._id || '').toLowerCase().includes('auth') ||
+    (item._id || '').toLowerCase().includes('login') ||
+    (item._id || '').toLowerCase().includes('unified')
+  ).reduce((sum, item) => sum + item.count, 0).toLocaleString()}
 
 ### Network (network)  
 - Look for: NetworkMonitor, network, tcp, udp, dns, http patterns
-- Estimated logs: ${results.logSourceAnalysis.distribution.filter(item => 
-  (item._id || '').toLowerCase().includes('network') || 
-  (item._id || '').toLowerCase().includes('monitor')
-).reduce((sum, item) => sum + item.count, 0).toLocaleString()}
+- Estimated logs: ${results.logSourceAnalysis.distribution.filter(item =>
+    (item._id || '').toLowerCase().includes('network') ||
+    (item._id || '').toLowerCase().includes('monitor')
+  ).reduce((sum, item) => sum + item.count, 0).toLocaleString()}
 
 ### System (system)
 - Look for: Security, windows, defender, kernel, syslog patterns  
-- Estimated logs: ${results.logSourceAnalysis.distribution.filter(item => 
-  (item._id || '').toLowerCase().includes('security') || 
-  (item._id || '').toLowerCase().includes('windows') ||
-  (item._id || '').toLowerCase().includes('defender') ||
-  (item._id || '').toLowerCase().includes('kernel')
-).reduce((sum, item) => sum + item.count, 0).toLocaleString()}
+- Estimated logs: ${results.logSourceAnalysis.distribution.filter(item =>
+    (item._id || '').toLowerCase().includes('security') ||
+    (item._id || '').toLowerCase().includes('windows') ||
+    (item._id || '').toLowerCase().includes('defender') ||
+    (item._id || '').toLowerCase().includes('kernel')
+  ).reduce((sum, item) => sum + item.count, 0).toLocaleString()}
 
 ### Other Categories
 - **Firewall**: Look for firewall, iptables, block/allow patterns
@@ -342,10 +342,10 @@ async function main() {
       console.error('❌ Failed to connect to database');
       process.exit(1);
     }
-    
+
     console.log('📊 Starting log type analysis...');
     const results = await analyzeLogTypes();
-    
+
     console.log('\n✅ ANALYSIS COMPLETE');
     console.log('📊 Key Statistics:');
     console.log(`   Total logs: ${results.totalLogs.toLocaleString()}`);
@@ -354,7 +354,7 @@ async function main() {
     console.log('\n📄 Generated files:');
     console.log('   - docs/log-type-analysis-results.json');
     console.log('   - docs/log-type-analysis-report.md');
-    
+
   } catch (error) {
     console.error('❌ Analysis failed:', error.message);
     console.error('Stack trace:', error.stack);

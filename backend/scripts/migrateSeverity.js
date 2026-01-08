@@ -3,7 +3,7 @@ import 'dotenv/config'
 import Log from '../models/Log.js'
 import severityClassifier from '../utils/severityClassifier.js'
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/cyart'
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://ML:MLadmin@100.68.123.13:27017/soc_platform?authSource=admin'
 
 const migrateSeverity = async () => {
     try {

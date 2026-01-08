@@ -110,6 +110,17 @@ export const useAPIStore = defineStore('api', () => {
     }
   }
 
+  // Fetch live threat flows for visualization
+  const fetchLiveThreats = async (limit = 10) => {
+    try {
+      const data = await logsAPI.getThreats(limit)
+      return data.data || []
+    } catch (err) {
+      console.error('Failed to fetch live threats:', err)
+      return []
+    }
+  }
+
   // Fetch logs by IP
   const fetchLogsByIP = async (ip, timeRangeValue = timeRange.value) => {
     loading.value = true
@@ -528,6 +539,7 @@ export const useAPIStore = defineStore('api', () => {
     fetchDashboardStats,
     fetchRecentLogs,
     fetchGeoData,
+    fetchLiveThreats,
     fetchLogsByIP,
     fetchLogsBySeverity,
     fetchLogsByEndpoint,

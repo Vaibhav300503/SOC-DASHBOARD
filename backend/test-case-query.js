@@ -1,8 +1,11 @@
 // Test direct MongoDB case query
 import mongoose from 'mongoose'
+import dotenv from 'dotenv'
 import Case from './models/Case.js'
 
-const MONGODB_URI = 'mongodb://ML:MLadmin@100.68.123.13:27017/soc_platform?authSource=admin'
+dotenv.config()
+
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://ML:MLadmin@100.68.123.13:27017/soc_platform?authSource=admin'
 
 async function testCaseQuery() {
   try {
@@ -17,13 +20,13 @@ async function testCaseQuery() {
       .lean()
 
     console.log(`Found ${mongoCases.length} cases in MongoDB`)
-    
+
     if (mongoCases.length > 0) {
       console.log('Cases:')
       mongoCases.forEach((caseItem, index) => {
         console.log(`${index + 1}. ${caseItem.title} (Severity: ${caseItem.severity})`)
       })
-      
+
       // Test the mapping used in the service
       const mappedCases = mongoCases.map(mongoCase => ({
         ...mongoCase,
@@ -32,7 +35,7 @@ async function testCaseQuery() {
         createdAt: mongoCase.created_at,
         _createdAt: mongoCase.created_at
       }))
-      
+
       console.log('\nMapped cases (first one):')
       console.log(JSON.stringify(mappedCases[0], null, 2))
     }

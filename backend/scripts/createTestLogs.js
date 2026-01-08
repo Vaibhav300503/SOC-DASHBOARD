@@ -1,7 +1,10 @@
 import mongoose from 'mongoose'
+import dotenv from 'dotenv'
 import Log from '../models/Log.js'
 
-const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/soc-platform'
+dotenv.config()
+
+const mongoUri = process.env.MONGODB_URI || 'mongodb://ML:MLadmin@100.68.123.13:27017/soc_platform?authSource=admin'
 
 async function createTestLogs() {
   try {
@@ -33,7 +36,7 @@ async function createTestLogs() {
           city: 'New York'
         }
       })),
-      
+
       // High logs
       ...Array(10).fill(null).map((_, i) => ({
         timestamp: new Date(Date.now() - Math.random() * 86400000),
@@ -57,7 +60,7 @@ async function createTestLogs() {
           city: 'Los Angeles'
         }
       })),
-      
+
       // Medium logs
       ...Array(15).fill(null).map((_, i) => ({
         timestamp: new Date(Date.now() - Math.random() * 86400000),
@@ -81,7 +84,7 @@ async function createTestLogs() {
           city: 'Chicago'
         }
       })),
-      
+
       // Low logs
       ...Array(20).fill(null).map((_, i) => ({
         timestamp: new Date(Date.now() - Math.random() * 86400000),

@@ -1,4 +1,9 @@
 import mongoose from 'mongoose'
+import dotenv from 'dotenv'
+
+// Load environment variables
+dotenv.config()
+
 import Log from '../models/Log.js'
 import Event from '../models/Event.js'
 import BlockedIP from '../models/BlockedIP.js'
@@ -7,7 +12,7 @@ import AlertRule from '../models/AlertRule.js'
 import AlertEvent from '../models/AlertEvent.js'
 import User from '../models/User.js'
 
-const MONGODB_URI = 'mongodb://ML:MLadmin@100.68.123.13:27017/soc_platform?authSource=admin'
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://ML:MLadmin@100.68.123.13:27017/soc_platform?authSource=admin'
 
 const seedData = {
   logs: [
@@ -188,12 +193,12 @@ async function seedDatabase() {
       // Add created_by field (use first user or create a default)
       const defaultUser = await User.findOne()
       const createdBy = defaultUser ? defaultUser._id : new mongoose.Types.ObjectId()
-      
+
       const blockedIPsWithUser = seedData.blockedIPs.map(ip => ({
         ...ip,
         created_by: createdBy
       }))
-      
+
       await BlockedIP.insertMany(blockedIPsWithUser)
       console.log('✓ Seeded blocked_ips collection with', blockedIPsWithUser.length, 'entries')
     } else {
@@ -205,12 +210,12 @@ async function seedDatabase() {
     if (safeCount === 0) {
       const defaultUser = await User.findOne()
       const createdBy = defaultUser ? defaultUser._id : new mongoose.Types.ObjectId()
-      
+
       const safeIPsWithUser = seedData.safeIPs.map(ip => ({
         ...ip,
         created_by: createdBy
       }))
-      
+
       await SafeIP.insertMany(safeIPsWithUser)
       console.log('✓ Seeded safe_ips collection with', safeIPsWithUser.length, 'entries')
     } else {
@@ -222,12 +227,12 @@ async function seedDatabase() {
     if (alertRulesCount === 0) {
       const defaultUser = await User.findOne()
       const createdBy = defaultUser ? defaultUser._id : new mongoose.Types.ObjectId()
-      
+
       const alertRulesWithUser = seedData.alertRules.map(rule => ({
         ...rule,
         created_by: createdBy
       }))
-      
+
       await AlertRule.insertMany(alertRulesWithUser)
       console.log('✓ Seeded alert_rules collection with', alertRulesWithUser.length, 'entries')
     } else {
@@ -239,12 +244,12 @@ async function seedDatabase() {
     if (alertEventsCount === 0) {
       const defaultUser = await User.findOne()
       const createdBy = defaultUser ? defaultUser._id : new mongoose.Types.ObjectId()
-      
+
       const alertEventsWithUser = seedData.alertEvents.map(event => ({
         ...event,
         created_by: createdBy
       }))
-      
+
       await AlertEvent.insertMany(alertEventsWithUser)
       console.log('✓ Seeded alert_events collection with', alertEventsWithUser.length, 'entries')
     } else {

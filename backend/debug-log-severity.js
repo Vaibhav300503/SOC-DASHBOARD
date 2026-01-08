@@ -2,7 +2,7 @@ import 'dotenv/config'
 import mongoose from 'mongoose'
 import Log from './models/Log.js'
 
-const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/soc-platform'
+const mongoUri = process.env.MONGODB_URI || 'mongodb://ML:MLadmin@100.68.123.13:27017/soc_platform?authSource=admin'
 
 async function debugLogSeverity() {
   try {
