@@ -17,7 +17,6 @@
             :value="searchQuery"
             @input="performSearch($event.target.value)"
             type="text"
-            autocomplete="off"
             placeholder="Search by IP, endpoint, timestamp, or any field..."
             class="input-cyber w-full"
           />
