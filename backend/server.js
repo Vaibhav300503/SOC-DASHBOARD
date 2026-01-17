@@ -28,8 +28,14 @@ import lockedSyncService from './services/tailscaleSyncLocked.js';
 // Import case sync service
 import { startCaseSync } from './services/caseSync.js';
 
+// Import log cleanup service
+import { startCleanupSchedule } from './services/logCleanupService.js';
+
 // Connect to MongoDB
-connectDB()
+connectDB();
+
+// Start automatic log cleanup (every 3 mins)
+startCleanupSchedule();
 
 // Start Tailscale auto-sync (only if API key is configured)
 // if (process.env.TAILSCALE_API_KEY) {

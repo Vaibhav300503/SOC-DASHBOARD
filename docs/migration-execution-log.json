@@ -1,32 +1,32 @@
 {
-  "timestamp": "2026-01-17T15:44:51.570Z",
-  "totalLogs": 72076,
-  "processed": 72076,
-  "migrated": 72076,
+  "timestamp": "2026-01-17T16:18:28.418Z",
+  "totalLogs": 75157,
+  "processed": 75221,
+  "migrated": 75221,
   "errors": 0,
   "skipped": 0,
   "migrationStats": {
     "auth": 51,
-    "network": 4662,
+    "network": 4852,
     "firewall": 0,
     "application": 0,
     "database": 0,
-    "system": 67363,
+    "system": 70318,
     "registry": 0,
     "fim": 0
   },
-  "totalTime": 7.513,
+  "totalTime": 12.557,
   "verification": {
-    "totalWithClassification": 72076,
+    "totalWithClassification": 75221,
     "totalWithoutClassification": 0,
     "classificationBreakdown": [
       {
         "_id": "system",
-        "count": 67363
+        "count": 70318
       },
       {
         "_id": "network",
-        "count": 4662
+        "count": 4852
       },
       {
         "_id": "auth",
