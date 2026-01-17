@@ -24,7 +24,7 @@ class SeverityClassifier {
                 regex: /low|info|debug|trace|system/i // Explicit low matches
             }
         ]
-        this.defaultSeverity = 'Low'
+        this.defaultSeverity = 'Info'  // Changed from 'Low' to 'Info' for null severities
     }
 
     /**
@@ -66,6 +66,7 @@ class SeverityClassifier {
         if (s.includes('critical')) return 'Critical'
         if (s.includes('high')) return 'High'
         if (s.includes('medium')) return 'Medium'
+        if (s.includes('info')) return 'Info'
         return 'Low'
     }
 

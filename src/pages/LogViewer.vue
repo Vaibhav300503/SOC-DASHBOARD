@@ -35,6 +35,7 @@
               <option value="High">High</option>
               <option value="Medium">Medium</option>
               <option value="Low">Low</option>
+              <option value="Info">Info</option>
             </select>
           </div>
 
@@ -82,7 +83,7 @@
     <!-- Raw Log Viewer -->
     <div class="space-y-4">
       <h2 class="text-2xl font-black title-gradient tracking-tight">Raw Log Viewer</h2>
-      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
         <div class="stat-card text-center">
           <div class="stat-value text-cyber-400">{{ apiStore.totalLogs }}</div>
           <div class="stat-label">Total Logs</div>
@@ -102,6 +103,10 @@
         <div class="stat-card text-center">
           <div class="stat-value text-neon-green">{{ lowInResults }}</div>
           <div class="stat-label">Low</div>
+        </div>
+        <div class="stat-card text-center">
+          <div class="stat-value text-blue-400">{{ infoInResults }}</div>
+          <div class="stat-label">Info</div>
         </div>
       </div>
     </div>
@@ -286,6 +291,9 @@ const mediumInResults = computed(() => {
 const lowInResults = computed(() => {
   return apiStore.severityBreakdown.find(s => s._id === 'Low')?.count || 0
 })
+const infoInResults = computed(() => {
+  return apiStore.severityBreakdown.find(s => s._id === 'Info')?.count || 0
+})
 
 const topSourceIPsInResults = computed(() => getTopSourceIPs.value)
 const topEndpointsInResults = computed(() => getTopEndpoints.value)
@@ -304,21 +312,25 @@ const formatTime = (timestamp) => {
 }
 
 const getSeverityClass = (severity) => {
-  if (!severity) return 'low'
+  if (!severity) return 'info'  // Changed from 'low' to 'info'
   const s = String(severity).toLowerCase().trim()
   if (s.includes('critical')) return 'critical'
   if (s.includes('high')) return 'high'
   if (s.includes('medium')) return 'medium'
-  return 'low'
+  if (s.includes('info')) return 'info'
+  if (s.includes('low')) return 'low'
+  return 'info'
 }
 
 const getSeverityLabel = (severity) => {
-  if (!severity) return 'Low'
+  if (!severity) return 'Info'  // Changed from 'Low' to 'Info'
   const s = String(severity).toLowerCase().trim()
   if (s.includes('critical')) return 'Critical'
   if (s.includes('high')) return 'High'
   if (s.includes('medium')) return 'Medium'
-  return 'Low'
+  if (s.includes('info')) return 'Info'
+  if (s.includes('low')) return 'Low'
+  return 'Info'
 }
 
 const getCopyButtonText = () => {

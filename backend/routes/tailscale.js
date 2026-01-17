@@ -19,7 +19,7 @@ router.post('/ingest', verifyTailscaleSignature, async (req, res) => {
     console.log('Body:', JSON.stringify(req.body, null, 2))
     console.log('Body type:', typeof req.body)
     console.log('Is array?', Array.isArray(req.body))
-    
+
     const logs = Array.isArray(req.body) ? req.body : [req.body]
     console.log('Number of logs:', logs.length)
 
@@ -29,7 +29,7 @@ router.post('/ingest', verifyTailscaleSignature, async (req, res) => {
       if (log.timestamp && !log.ts) {
         log.ts = new Date(log.timestamp)
       }
-      
+
       console.log(`Log ${index}:`, JSON.stringify(log, null, 2))
       return {
         ...log,
@@ -223,13 +223,13 @@ router.get('/test-db', async (req, res) => {
   try {
     // Test connection by counting documents
     const count = await TailscaleLog.countDocuments();
-    
+
     // Get some sample data
     const sampleData = await TailscaleLog.find().limit(5).sort({ ts: -1 }).lean();
-    
+
     // Get collection stats
     const stats = await TailscaleLog.collection.stats();
-    
+
     res.json({
       success: true,
       message: 'MongoDB connection successful!',
@@ -262,10 +262,10 @@ router.get('/test-db', async (req, res) => {
 router.get('/devices', async (req, res) => {
   try {
     const { status, riskLevel, user, limit = 100, skip = 0 } = req.query;
-    
+
     // Fetch devices from live Tailscale API
     const liveDevices = await tailscaleService.getDevices();
-    
+
     // Transform live API data to match expected format
     const devices = liveDevices.map(device => ({
       id: device.id,
@@ -357,7 +357,7 @@ router.post('/import-historical', async (req, res) => {
   try {
     console.log('Request body received:', JSON.stringify(req.body, null, 2));
     console.log('Request body type:', typeof req.body);
-    
+
     // Handle both number and object input
     let daysBack = 7;
     if (typeof req.body === 'number') {
@@ -372,12 +372,12 @@ router.post('/import-historical', async (req, res) => {
         daysBack = 7;
       }
     }
-    
+
     console.log(`Starting historical log import for last ${daysBack} days...`);
-    
+
     // Fetch historical logs from Tailscale API
     const historicalLogs = await tailscaleService.getHistoricalLogs(daysBack);
-    
+
     if (!historicalLogs || historicalLogs.length === 0) {
       return res.json({
         success: true,
@@ -385,30 +385,30 @@ router.post('/import-historical', async (req, res) => {
         imported: 0
       });
     }
-    
+
     // Normalize logs for storage
     const normalizedLogs = historicalLogs.map(log => {
       // Convert Tailscale timestamp to our ts field
       if (log.timestamp && !log.ts) {
         log.ts = new Date(log.timestamp);
       }
-      
+
       return {
         ...log,
         source: 'historical_import',
         ingested_at: new Date()
       };
     });
-    
+
     // Check for duplicates to avoid re-inserting
     const existingIds = await TailscaleLog.distinct('timestamp', {
       source: 'historical_import'
     });
-    
-    const newLogs = normalizedLogs.filter(log => 
+
+    const newLogs = normalizedLogs.filter(log =>
       !existingIds.includes(log.timestamp)
     );
-    
+
     if (newLogs.length === 0) {
       return res.json({
         success: true,
@@ -417,20 +417,20 @@ router.post('/import-historical', async (req, res) => {
         total: historicalLogs.length
       });
     }
-    
+
     // Insert in batches to avoid timeouts
     const batchSize = 100;
     let totalInserted = 0;
-    
+
     for (let i = 0; i < newLogs.length; i += batchSize) {
       const batch = newLogs.slice(i, i + batchSize);
       const result = await TailscaleLog.insertMany(batch, { ordered: false });
       totalInserted += result.length;
-      console.log(`Inserted batch ${Math.floor(i/batchSize) + 1}: ${result.length} logs`);
+      console.log(`Inserted batch ${Math.floor(i / batchSize) + 1}: ${result.length} logs`);
     }
-    
+
     console.log(`Historical import completed: ${totalInserted} new logs inserted`);
-    
+
     res.json({
       success: true,
       message: 'Historical logs imported successfully',
@@ -438,7 +438,7 @@ router.post('/import-historical', async (req, res) => {
       total: historicalLogs.length,
       skipped: historicalLogs.length - totalInserted
     });
-    
+
   } catch (error) {
     console.error('Historical import error:', error);
     res.status(500).json({ error: error.message });
@@ -554,7 +554,7 @@ router.get('/dashboard', async (req, res) => {
 router.get('/topology', async (req, res) => {
   try {
     const devices = await tailscaleService.getDevices();
-    
+
     // Transform Tailscale devices into network nodes
     const nodes = devices.map(device => ({
       id: device.nodeId || device.name || device.addresses?.[0] || 'unknown',
@@ -578,7 +578,7 @@ router.get('/topology', async (req, res) => {
     // Create connections between nodes based on Tailscale network
     const edges = [];
     const onlineNodes = nodes.filter(node => node.status === 'online');
-    
+
     // Connect all online nodes in a mesh pattern (simplified)
     for (let i = 0; i < onlineNodes.length - 1; i++) {
       for (let j = i + 1; j < onlineNodes.length; j++) {
@@ -592,7 +592,7 @@ router.get('/topology', async (req, res) => {
       }
     }
 
-    res.json({ 
+    res.json({
       success: true,
       data: {
         nodes,
@@ -604,9 +604,9 @@ router.get('/topology', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching Tailscale topology:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch network topology' 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch network topology'
     });
   }
 });
@@ -614,10 +614,10 @@ router.get('/topology', async (req, res) => {
 router.get('/dashboard-live', async (req, res) => {
   try {
     console.log('Fetching live data from Tailscale API...');
-    
+
     // Fetch devices directly from Tailscale API
     const devices = await tailscaleService.getDevices();
-    
+
     // Calculate device stats from live data
     const deviceStats = {
       totalDevices: devices.length,
@@ -628,14 +628,14 @@ router.get('/dashboard-live', async (req, res) => {
       mediumRisk: 0,
       lowRisk: 0
     };
-    
+
     // Get recent logs from MongoDB (since Tailscale API doesn't provide activity logs)
     const recentActivity = await TailscaleLog.find({
       ts: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
     })
       .sort({ ts: -1 })
       .limit(10);
-    
+
     // Geographic distribution - use cached data since live API doesn't provide locations
     const cachedDevices = await TailscaleDevice.find({}).lean();
     const geoDistribution = cachedDevices
@@ -653,7 +653,7 @@ router.get('/dashboard-live', async (req, res) => {
         });
         return acc;
       }, {});
-    
+
     // OS distribution from live devices
     const osDistribution = devices
       .filter(d => d.os)
@@ -662,12 +662,12 @@ router.get('/dashboard-live', async (req, res) => {
         acc[os] = (acc[os] || 0) + 1;
         return acc;
       }, {});
-    
+
     const osDistributionArray = Object.entries(osDistribution).map(([os, count]) => ({
       _id: os,
       count
     }));
-    
+
     res.json({
       deviceStats,
       recentActivity,

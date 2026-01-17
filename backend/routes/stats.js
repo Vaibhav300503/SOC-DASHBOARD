@@ -10,12 +10,14 @@ const router = express.Router()
 
 // Helper function to normalize severity values
 const normalizeSeverity = (severity) => {
-  if (!severity) return 'Low'
+  if (!severity) return 'Info'  // Changed from 'Low' to 'Info'
   const s = String(severity).toLowerCase().trim()
   if (s.includes('critical')) return 'Critical'
   if (s.includes('high')) return 'High'
   if (s.includes('medium')) return 'Medium'
-  return 'Low'
+  if (s.includes('info')) return 'Info'
+  if (s.includes('low')) return 'Low'
+  return 'Info'
 }
 
 /**
@@ -55,8 +57,8 @@ router.get('/dashboard', async (req, res) => {
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          // Assign severity based on stored field
-          assignedSeverity: { $ifNull: ['$severity', 'Low'] }
+          // Assign severity based on stored field - default to Info
+          assignedSeverity: { $ifNull: ['$severity', 'Info'] }
         }
       }
     ]
@@ -124,6 +126,7 @@ router.get('/dashboard', async (req, res) => {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
           // Use standardized log_type if available, otherwise classify on-the-fly
+          // Check BOTH top-level log_source AND metadata.log_source
           standardizedLogType: {
             $cond: {
               if: { $ne: ['$log_type', null] },
@@ -131,22 +134,26 @@ router.get('/dashboard', async (req, res) => {
               else: {
                 $switch: {
                   branches: [
+                    // Network - check top level log_source first
+                    { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /network.*snapshot|network.*monitor|tailscale/i } }, then: 'Network' },
                     // Authentication
-                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /unified.*auth|windows.*auth|authentication/i } }, then: 'auth' },
-                    // Network
-                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /network.*snapshot|network.*monitor|tailscale/i } }, then: 'network' },
+                    { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /unified.*auth|windows.*auth|authentication/i } }, then: 'Authentication' },
                     // Firewall
-                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /firewall/i } }, then: 'firewall' },
+                    { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /firewall/i } }, then: 'Firewall' },
                     // Application
-                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /application|nginx|apache|web.*api/i } }, then: 'application' },
+                    { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /application|nginx|apache|web.*api/i } }, then: 'Application' },
                     // Database
-                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /database|sql|mysql|postgres|mongodb/i } }, then: 'database' },
+                    { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /database|sql|mysql|postgres|mongodb/i } }, then: 'Database' },
                     // Registry
-                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /registry|reg|hkey/i } }, then: 'registry' },
+                    { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /registry|reg|hkey/i } }, then: 'Registry' },
                     // FIM
-                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /fim|file.*integrity/i } }, then: 'fim' }
+                    { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /fim|file.*integrity/i } }, then: 'File Integrity' },
+                    // Fallback: Check metadata.log_source
+                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /network.*snapshot|network.*monitor|tailscale/i } }, then: 'Network' },
+                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /unified.*auth|windows.*auth|authentication/i } }, then: 'Authentication' },
+                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /firewall/i } }, then: 'Firewall' }
                   ],
-                  default: 'system'
+                  default: 'System'
                 }
               }
             }
@@ -346,8 +353,8 @@ router.get('/severity', async (req, res) => {
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          // Assign severity based on stored field
-          assignedSeverity: { $ifNull: ['$severity', 'Low'] }
+          // Assign severity based on stored field - default to Info
+          assignedSeverity: { $ifNull: ['$severity', 'Info'] }
         }
       }
     ]
@@ -392,8 +399,8 @@ router.get('/timeline', async (req, res) => {
       {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
-          // Assign severity based on stored field
-          assignedSeverity: { $ifNull: ['$severity', 'Low'] }
+          // Assign severity based on stored field - default to Info
+          assignedSeverity: { $ifNull: ['$severity', 'Info'] }
         }
       }
     ]

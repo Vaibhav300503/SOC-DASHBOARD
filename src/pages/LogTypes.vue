@@ -82,10 +82,21 @@
       >
         Low
       </button>
+      <button
+        @click="filterSeverity = 'Info'"
+        :class="[
+          'px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all duration-200',
+          filterSeverity === 'Info'
+            ? 'bg-blue-600 text-white border border-blue-500'
+            : 'bg-slate-dark-800 text-slate-dark-300 border border-slate-dark-700 hover:border-blue-500'
+        ]"
+      >
+        Info
+      </button>
     </div>
 
     <!-- Statistics -->
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
       <div class="stat-card card-accent-cyan text-center-left">
         <div class="stat-value text-accent-primary">{{ totalFilteredCount }}</div>
         <div class="stat-label">{{ selectedLogType }} Logs</div>
@@ -105,6 +116,10 @@
       <div class="stat-card card-accent-green text-center-left">
         <div class="stat-value text-neon-green">{{ lowCount }}</div>
         <div class="stat-label">Low</div>
+      </div>
+      <div class="stat-card card-accent-blue text-center-left">
+        <div class="stat-value text-blue-400">{{ infoCount }}</div>
+        <div class="stat-label">Info</div>
       </div>
     </div>
 
@@ -127,6 +142,7 @@
             <option value="High">High</option>
             <option value="Medium">Medium</option>
             <option value="Low">Low</option>
+            <option value="Info">Info</option>
           </select>
         </div>
         <div>
@@ -187,10 +203,12 @@
               <th v-if="selectedLogType === 'Registry' || selectedLogType === 'All'">Key Name</th>
               <th v-if="selectedLogType !== 'Registry'">Source IP</th>
               <th v-if="selectedLogType !== 'Registry'">Destination IP</th>
+              <th v-if="selectedLogType !== 'Registry'">Protocol</th>
+              <th v-if="selectedLogType !== 'Registry'">Ports</th>
               <th v-if="selectedLogType !== 'Registry'">Endpoint</th>
               <th>Log Type</th>
               <th>Severity</th>
-              <th>Action</th>
+              <th>Status</th>
               <th class="text-center">Details</th>
             </tr>
           </thead>
@@ -217,6 +235,14 @@
               <td v-if="selectedLogType !== 'Registry'">
                 <code class="text-cyber-400 font-mono text-sm">{{ log.dest_ip }}</code>
               </td>
+              <td v-if="selectedLogType !== 'Registry'" class="text-slate-dark-300 text-sm">
+                <span class="px-2 py-1 rounded text-xs font-semibold bg-slate-dark-700 text-purple-400">
+                  {{ log.protocol || log.raw_data?.protocol || log.raw?.protocol || 'N/A' }}
+                </span>
+              </td>
+              <td v-if="selectedLogType !== 'Registry'" class="text-slate-dark-400 text-sm font-mono">
+                {{ log.src_port || log.raw_data?.src_port || 'N/A' }} → {{ log.dst_port || log.raw_data?.dst_port || 'N/A' }}
+              </td>
               <td v-if="selectedLogType !== 'Registry'" class="text-slate-dark-300">{{ log.endpoint }}</td>
               <td>
                 <span class="px-2 py-1 rounded text-xs font-semibold bg-slate-dark-700 text-slate-dark-300">
@@ -231,17 +257,12 @@
               <td>
                 <span :class="[
                   'px-2 py-1 rounded text-xs font-semibold',
-                  selectedLogType === 'Registry' ? (
-                    log.raw?.action === 'CREATE' ? 'bg-green-500/20 text-green-400' :
-                    log.raw?.action === 'DELETE' ? 'bg-red-500/20 text-red-400' :
-                    log.raw?.action === 'MODIFY' ? 'bg-yellow-500/20 text-yellow-400' :
-                    'bg-blue-500/20 text-blue-400'
-                  ) : (
-                    log.raw?.action === 'ALLOW' ? 'bg-neon-green/20 text-neon-green' :
-                    'bg-neon-red/20 text-neon-red'
-                  )
+                  (log.status || log.raw_data?.status || log.raw?.status || '').toUpperCase() === 'ESTABLISHED' ? 'bg-green-500/20  text-green-400' :
+                  (log.status || log.raw_data?.status || log.raw?.status || '').toUpperCase() === 'LISTEN' ? 'bg-blue-500/20 text-blue-400' :
+                  (log.status || log.raw_data?.status || log.raw?.status || '').toUpperCase() === 'CLOSE_WAIT' ? 'bg-yellow-500/20 text-yellow-400' :
+                  'bg-slate-700/20 text-slate-400'
                 ]">
-                  {{ log.raw?.action || 'N/A' }}
+                  {{ log.status || log.raw_data?.status || log.raw?.status || 'N/A' }}
                 </span>
               </td>
               <td class="text-center">
@@ -415,12 +436,38 @@
                 </div>
               </div>
               <div>
-                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Endpoint</div>
+                <div class="text-xs text-slate-400 uppercase  tracking-wide mb-1 font-medium">Endpoint</div>
                 <div class="text-slate-300">{{ selectedLog.endpoint || selectedLog.metadata?.endpoint_name || 'N/A' }}</div>
               </div>
               <div>
                 <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Protocol</div>
-                <div class="text-slate-300">{{ selectedLog.raw?.protocol || selectedLog.raw_data?.protocol || selectedLog.protocol || 'N/A' }}</div>
+                <div class="text-slate-300">
+                  <span class="px-2 py-1 rounded text-xs font-semibold bg-slate-900/50 border border-slate-700/30 text-purple-400">
+                    {{ selectedLog.raw?.protocol || selectedLog.raw_data?.protocol || selectedLog.protocol || 'N/A' }}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Source Port</div>
+                <div class="text-cyan-400 font-mono">{{ selectedLog.src_port || selectedLog.raw_data?.src_port || selectedLog.raw?.src_port || 'N/A' }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Destination Port</div>
+                <div class="text-cyan-400 font-mono">{{ selectedLog.dst_port || selectedLog.raw_data?.dst_port || selectedLog.raw?.dst_port || 'N/A' }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-slate-400 uppercase tracking-wide mb-1 font-medium">Connection Status</div>
+                <div>
+                  <span :class="[
+                    'px-2 py-1 rounded text-xs font-semibold',
+                    (selectedLog.status || selectedLog.raw_data?.status || selectedLog.raw?.status || '').toUpperCase() === 'ESTABLISHED' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                    (selectedLog.status || selectedLog.raw_data?.status || selectedLog.raw?.status || '').toUpperCase() === 'LISTEN' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                    (selectedLog.status || selectedLog.raw_data?.status || selectedLog.raw?.status || '').toUpperCase() === 'CLOSE_WAIT' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+                    'bg-slate-700/20 text-slate-400 border border-slate-700/30'
+                  ]">
+                    {{ selectedLog.status || selectedLog.raw_data?.status || selectedLog.raw?.status || 'N/A' }}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -684,12 +731,13 @@ const totalCount = ref(0) // Store total count from API
 // We no longer filter locally for the main list
 const filteredLogs = computed(() => logs.value)
 
-// Counts are now calculated from the currently fetched (filtered) logs for distribution
-// This ensures they update when the user changes filters (e.g., Log Type, Time Range)
-const criticalCount = computed(() => logs.value.filter(l => (l.severity || '').toLowerCase() === 'critical').length)
-const highCount = computed(() => logs.value.filter(l => (l.severity || '').toLowerCase() === 'high').length)
-const mediumCount = computed(() => logs.value.filter(l => (l.severity || '').toLowerCase() === 'medium').length)
-const lowCount = computed(() => logs.value.filter(l => (l.severity || '').toLowerCase() === 'low').length)
+// Use apiStore.severityBreakdown for TOTAL severity counts to match LogViewer
+// This ensures consistency across all tabs
+const criticalCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'Critical')?.count || 0)
+const highCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'High')?.count || 0)
+const mediumCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'Medium')?.count || 0)
+const lowCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'Low')?.count || 0)
+const infoCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'Info')?.count || 0)
 
 // Use the total count from the API response for the main counter
 const totalFilteredCount = computed(() => totalCount.value)
@@ -700,6 +748,7 @@ const severityDistribution = computed(() => [
   { name: 'High', value: highCount.value, color: '#ff6b35' },
   { name: 'Medium', value: mediumCount.value, color: '#ffd700' },
   { name: 'Low', value: lowCount.value, color: '#00ff88' },
+  { name: 'Info', value: infoCount.value, color: '#4a9eff' },
 ])
 
 const formatTime = (timestamp) => {

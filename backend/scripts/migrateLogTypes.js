@@ -107,8 +107,12 @@ async function migrateLogTypes() {
         try {
           // Classify the log
           const standardizedType = classifier.classify(log);
-          const originalType = log.metadata?.log_source || log.log_type || 'unknown';
+          // Check top level log_source FIRST, then metadata.log_source
+          const originalType = log.log_source || log.metadata?.log_source || log.log_type || 'unknown';
           const classificationMetadata = classifier.getClassificationMetadata();
+
+          // Set severity to Info if null
+          const severity = log.severity || 'Info';
 
           // Prepare bulk update operation
           bulkOps.push({
@@ -118,6 +122,7 @@ async function migrateLogTypes() {
                 $set: {
                   log_type: standardizedType,
                   original_log_type: originalType,
+                  severity: severity,
                   ...classificationMetadata
                 }
               }

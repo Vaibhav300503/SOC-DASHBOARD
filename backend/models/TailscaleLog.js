@@ -28,16 +28,16 @@ const tailscaleLogSchema = new mongoose.Schema({
     enum: ['success', 'failed', 'pending'],
     default: 'success'
   },
-  
+
   // Additional fields
   device_name: String,
   device_os: String,
   ip_address: String,
   tailnet: String,
-  
+
   // Raw data for debugging
   raw: mongoose.Schema.Types.Mixed,
-  
+
   // Metadata
   source: {
     type: String,

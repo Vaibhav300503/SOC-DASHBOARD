@@ -22,20 +22,20 @@ class LogTypeClassifier {
     try {
       // Extract potential log type sources in priority order
       const logSources = this.extractLogSources(log);
-      
+
       // Try to classify using each source
       for (const source of logSources) {
         if (!source) continue;
-        
+
         const category = this.matchCategory(source);
         if (category) {
           return category;
         }
       }
-      
+
       // Return default category if no match found
       return this.defaultCategory;
-      
+
     } catch (error) {
       console.error('Error classifying log:', error);
       return this.defaultCategory;
@@ -49,35 +49,40 @@ class LogTypeClassifier {
    */
   extractLogSources(log) {
     const sources = [];
-    
-    // Priority 1: metadata.log_source (primary field based on analysis)
+
+    // Priority 1: log_source at TOP LEVEL (agent logs send this at root)
+    if (log.log_source) {
+      sources.push(log.log_source);
+    }
+
+    // Priority 2: metadata.log_source (primary field based on analysis)
     if (log.metadata?.log_source) {
       sources.push(log.metadata.log_source);
     }
-    
-    // Priority 2: raw_data.log_source (fallback)
+
+    // Priority 3: raw_data.log_source (fallback)
     if (log.raw_data?.log_source) {
       sources.push(log.raw_data.log_source);
     }
-    
-    // Priority 3: log_type field (if exists)
+
+    // Priority 4: log_type field (if exists)
     if (log.log_type) {
       sources.push(log.log_type);
     }
-    
-    // Priority 4: raw_data.type
+
+    // Priority 5: raw_data.type
     if (log.raw_data?.type) {
       sources.push(log.raw_data.type);
     }
-    
-    // Priority 5: Extract from message or other fields
+
+    // Priority 6: Extract from message or other fields
     if (log.message) {
       const extractedType = this.extractFromMessage(log.message);
       if (extractedType) {
         sources.push(extractedType);
       }
     }
-    
+
     return sources.filter(Boolean);
   }
 
@@ -88,14 +93,14 @@ class LogTypeClassifier {
    */
   matchCategory(logSource) {
     const normalizedSource = logSource.toLowerCase().trim();
-    
+
     // Check each category's mapping rules
     for (const [category, rules] of Object.entries(this.mappingRules)) {
       // Check exact matches first
       if (rules.exactMatches && rules.exactMatches.includes(logSource)) {
         return category;
       }
-      
+
       // Check pattern matches
       if (rules.patterns) {
         for (const pattern of rules.patterns) {
@@ -104,7 +109,7 @@ class LogTypeClassifier {
           }
         }
       }
-      
+
       // Check keyword matches
       if (rules.keywords) {
         for (const keyword of rules.keywords) {
@@ -113,7 +118,7 @@ class LogTypeClassifier {
           }
         }
       }
-      
+
       // Check source name matches
       if (rules.sources) {
         for (const sourceName of rules.sources) {
@@ -123,7 +128,7 @@ class LogTypeClassifier {
         }
       }
     }
-    
+
     return null;
   }
 
@@ -136,9 +141,9 @@ class LogTypeClassifier {
     if (!message || typeof message !== 'string') {
       return null;
     }
-    
+
     const normalizedMessage = message.toLowerCase();
-    
+
     // Look for common patterns in messages
     const patterns = [
       { pattern: /authentication|login|logon|auth/i, type: 'authentication' },
@@ -149,13 +154,13 @@ class LogTypeClassifier {
       { pattern: /registry|reg|hkey/i, type: 'registry' },
       { pattern: /file.*integrity|fim/i, type: 'fim' }
     ];
-    
+
     for (const { pattern, type } of patterns) {
       if (pattern.test(normalizedMessage)) {
         return type;
       }
     }
-    
+
     return null;
   }
 
@@ -198,28 +203,28 @@ class LogTypeClassifier {
       categoryBreakdown: {},
       unclassifiedSources: []
     };
-    
+
     // Initialize category breakdown
     Object.keys(this.mappingRules).forEach(category => {
       stats.categoryBreakdown[category] = 0;
     });
     stats.categoryBreakdown[this.defaultCategory] = 0;
-    
+
     logSources.forEach(source => {
       const category = this.matchCategory(source) || this.defaultCategory;
-      
+
       if (category === this.defaultCategory && !this.matchCategory(source)) {
         stats.unclassified++;
         stats.unclassifiedSources.push(source);
       } else {
         stats.classified++;
       }
-      
+
       stats.categoryBreakdown[category]++;
     });
-    
+
     stats.coveragePercentage = ((stats.classified / stats.total) * 100).toFixed(2);
-    
+
     return stats;
   }
 
@@ -236,7 +241,7 @@ class LogTypeClassifier {
       unclassifiedSources: [],
       coverageByVolume: 0
     };
-    
+
     // Initialize category stats
     Object.keys(this.mappingRules).forEach(category => {
       validation.categoryStats[category] = {
@@ -250,27 +255,27 @@ class LogTypeClassifier {
       logs: 0,
       sourceNames: []
     };
-    
+
     let classifiedLogs = 0;
-    
+
     logSourceData.forEach(item => {
       const source = item._id;
       const count = item.count;
       const category = this.matchCategory(source) || this.defaultCategory;
-      
+
       validation.categoryStats[category].sources++;
       validation.categoryStats[category].logs += count;
       validation.categoryStats[category].sourceNames.push(`${source} (${count})`);
-      
+
       if (category !== this.defaultCategory || this.matchCategory(source)) {
         classifiedLogs += count;
       } else {
         validation.unclassifiedSources.push({ source, count });
       }
     });
-    
+
     validation.coverageByVolume = ((classifiedLogs / validation.totalLogs) * 100).toFixed(2);
-    
+
     return validation;
   }
 }

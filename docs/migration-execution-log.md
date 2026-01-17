@@ -1,41 +1,41 @@
 # Log Type Migration Execution Log
 
-**Executed**: 2026-01-04T17:37:08.672Z
+**Executed**: 2026-01-17T15:44:51.570Z
 **Status**: ✅ SUCCESS
 
 ## Migration Summary
 
-- **Total Logs**: 74,901
-- **Processed**: 74,901
-- **Migrated**: 74,901
+- **Total Logs**: 72,076
+- **Processed**: 72,076
+- **Migrated**: 72,076
 - **Errors**: 0
 - **Skipped**: 0
-- **Total Time**: 146.04 seconds
+- **Total Time**: 7.51 seconds
 
 ## Classification Breakdown
 
 | Category | Count | Percentage |
 |----------|-------|------------|
-| auth | 246 | 0.33% |
-| network | 24,119 | 32.20% |
-| firewall | 95 | 0.13% |
-| application | 353 | 0.47% |
+| auth | 51 | 0.07% |
+| network | 4,662 | 6.47% |
+| firewall | 0 | 0.00% |
+| application | 0 | 0.00% |
 | database | 0 | 0.00% |
-| system | 50,083 | 66.87% |
+| system | 67,363 | 93.46% |
 | registry | 0 | 0.00% |
-| fim | 5 | 0.01% |
+| fim | 0 | 0.00% |
 
 ## Verification Results
 
-- **Logs with Classification**: 74,901
+- **Logs with Classification**: 72,076
 - **Logs without Classification**: 0
 - **Null Log Types**: 0
 - **Verification Status**: ✅ PASSED
 
 ## Performance Metrics
 
-- **Processing Rate**: 513 logs/second
-- **Migration Rate**: 513 logs/second
+- **Processing Rate**: 9594 logs/second
+- **Migration Rate**: 9594 logs/second
 - **Success Rate**: 100.00%
 
 ---

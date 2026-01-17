@@ -8,19 +8,20 @@
 /**
  * Normalize any severity value to standard format
  * @param {string|null|undefined} severity - Raw severity value from backend
- * @returns {string} - Normalized severity: 'Critical', 'High', 'Medium', 'Low'
+ * @returns {string} - Normalized severity: 'Critical', 'High', 'Medium', 'Low', 'Info'
  */
 export const normalizeSeverity = (severity) => {
-  if (!severity) return 'Low'
-  
+  if (!severity) return 'Info'  // Changed default from 'Low' to 'Info'
+
   const s = String(severity).toLowerCase().trim()
-  
+
   if (s.includes('critical')) return 'Critical'
   if (s.includes('high')) return 'High'
   if (s.includes('medium')) return 'Medium'
   if (s.includes('low')) return 'Low'
-  
-  return 'Low'
+  if (s.includes('info')) return 'Info'
+
+  return 'Info'
 }
 
 /**
@@ -49,30 +50,32 @@ export const getSeverityLabel = (severity) => {
  */
 export const getSeverityColor = (severity) => {
   const normalized = normalizeSeverity(severity)
-  
+
   const colors = {
     'Critical': '#ff0055',
     'High': '#ff6b35',
     'Medium': '#ffd700',
-    'Low': '#00ff88'
+    'Low': '#00ff88',
+    'Info': '#4a9eff'
   }
-  
-  return colors[normalized] || colors['Low']
+
+  return colors[normalized] || colors['Info']
 }
 
 /**
  * Severity levels in order of priority
  */
-export const SEVERITY_LEVELS = ['Critical', 'High', 'Medium', 'Low']
+export const SEVERITY_LEVELS = ['Critical', 'High', 'Medium', 'Low', 'Info']
 
 /**
  * Severity priority map for sorting
  */
 export const SEVERITY_PRIORITY = {
-  'Critical': 4,
-  'High': 3,
-  'Medium': 2,
-  'Low': 1
+  'Critical': 5,
+  'High': 4,
+  'Medium': 3,
+  'Low': 2,
+  'Info': 1
 }
 
 /**

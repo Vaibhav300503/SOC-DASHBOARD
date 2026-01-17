@@ -7,7 +7,7 @@
 // The 8 standardized log type categories
 export const STANDARD_LOG_TYPES = [
   'auth',
-  'network', 
+  'network',
   'firewall',
   'application',
   'database',
@@ -20,7 +20,7 @@ export const STANDARD_LOG_TYPES = [
 export const CATEGORY_DISPLAY_NAMES = {
   'auth': 'Authentication',
   'network': 'Network',
-  'firewall': 'Firewall', 
+  'firewall': 'Firewall',
   'application': 'Application',
   'database': 'Database',
   'system': 'System',
@@ -50,14 +50,14 @@ export const CATEGORY_COLORS = {
   },
   'network': {
     bg: 'bg-green-500/10',
-    border: 'border-green-500/30', 
+    border: 'border-green-500/30',
     text: 'text-green-400',
     hover: 'hover:bg-green-500/20'
   },
   'firewall': {
     bg: 'bg-red-500/10',
     border: 'border-red-500/30',
-    text: 'text-red-400', 
+    text: 'text-red-400',
     hover: 'hover:bg-red-500/20'
   },
   'application': {
@@ -101,6 +101,10 @@ export const DEFAULT_LOG_TYPE = 'system';
  * @returns {string} - User-friendly display name
  */
 export function getDisplayName(category) {
+  // Handle specific log sources that need mapping
+  if (category === 'network_snapshot') return 'Network';
+  if (category === 'unified_auth') return 'Authentication';
+
   return CATEGORY_DISPLAY_NAMES[category] || category;
 }
 

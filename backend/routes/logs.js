@@ -17,10 +17,15 @@ const normalizeLogData = (log) => {
     ...doc,
     timestamp: doc.timestamp || doc.ingested_at || doc.created_at || doc.createdAt,
     severity: doc.severity || severityClassifier.classify(doc),
-    log_type: doc.log_type || doc.metadata?.log_source || doc.raw_data?.log_source || 'System',
-    endpoint: doc.endpoint || doc.metadata?.endpoint_name || doc.raw_data?.endpoint_name || doc.metadata?.hostname || doc.raw_data?.hostname || 'Unknown',
-    source_ip: doc.source_ip || doc.ip_address || doc.metadata?.ip_address || doc.raw_data?.src_ip || '0.0.0.0',
-    dest_ip: doc.dest_ip || doc.raw_data?.dst_ip || '0.0.0.0'
+    log_type: doc.log_type || doc.log_source || doc.metadata?.log_source || doc.raw_data?.log_source || 'System',
+    endpoint: doc.endpoint || doc.endpoint_name || doc.metadata?.endpoint_name || doc.raw_data?.endpoint_name || doc.hostname || doc.metadata?.hostname || doc.raw_data?.hostname || 'Unknown',
+    source_ip: doc.source_ip || doc.src_ip || doc.ip_address || doc.metadata?.ip_address || doc.raw_data?.src_ip || '0.0.0.0',
+    dest_ip: doc.dest_ip || doc.dst_ip || doc.raw_data?.dst_ip || '0.0.0.0',
+    // Include network fields for display
+    protocol: doc.protocol || doc.raw_data?.protocol || null,
+    src_port: doc.src_port || doc.raw_data?.src_port || null,
+    dst_port: doc.dst_port || doc.raw_data?.dst_port || null,
+    status: doc.status || doc.raw_data?.status || null
   }
 }
 
@@ -192,6 +197,7 @@ router.get('/', async (req, res) => {
       $addFields: {
         id: '$_id',
         // Use standardized log_type if available, otherwise classify on-the-fly
+        // Check BOTH top-level log_source AND metadata.log_source
         log_type: {
           $cond: {
             if: { $ne: ['$log_type', null] },
@@ -199,34 +205,42 @@ router.get('/', async (req, res) => {
             else: {
               $switch: {
                 branches: [
+                  // Network - check top level log_source first
+                  { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /network.*snapshot|network.*monitor|tailscale/i } }, then: 'Network' },
                   // Authentication
-                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /unified.*auth|windows.*auth|authentication/i } }, then: 'auth' },
-                  // Network
-                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /network.*snapshot|network.*monitor|tailscale/i } }, then: 'network' },
+                  { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /unified.*auth|windows.*auth|authentication/i } }, then: 'Authentication' },
                   // Firewall
-                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /firewall/i } }, then: 'firewall' },
+                  { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /firewall/i } }, then: 'Firewall' },
                   // Application
-                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /application|nginx|apache|web.*api/i } }, then: 'application' },
+                  { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /application|nginx|apache|web.*api/i } }, then: 'Application' },
                   // Database
-                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /database|sql|mysql|postgres|mongodb/i } }, then: 'database' },
+                  { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /database|sql|mysql|postgres|mongodb/i } }, then: 'Database' },
                   // Registry
-                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /registry|reg|hkey/i } }, then: 'registry' },
+                  { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /registry|reg|hkey/i } }, then: 'Registry' },
                   // FIM
-                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /fim|file.*integrity/i } }, then: 'fim' }
+                  { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /fim|file.*integrity/i } }, then: 'File Integrity' },
+                  // Fallback: Check metadata.log_source
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /network.*snapshot|network.*monitor|tailscale/i } }, then: 'Network' },
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /unified.*auth|windows.*auth|authentication/i } }, then: 'Authentication' },
+                  { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /firewall/i } }, then: 'Firewall' }
                 ],
-                default: 'system'
+                default: 'System'
               }
             }
           }
         },
-        original_log_type: { $ifNull: ['$original_log_type', '$metadata.log_source', 'unknown'] },
-        endpoint: { $ifNull: ['$endpoint', '$metadata.endpoint_name', '$metadata.hostname', '$raw_data.hostname', 'Unknown'] },
-        source_ip: { $ifNull: ['$ip_address', '$raw_data.src_ip', 'Unknown'] },
-        // Assign severity based on stored field
-        severity: { $ifNull: ['$severity', 'Low'] },
-        protocol: { $ifNull: ['$raw_data.protocol', 'N/A'] },
-        port: { $ifNull: ['$raw_data.src_port', 'N/A'] },
-        action: { $ifNull: ['$raw_data.status', '$parsed_data.event_action', 'N/A'] }
+        original_log_type: { $ifNull: ['$log_source', '$original_log_type', '$metadata.log_source', 'unknown'] },
+        endpoint: { $ifNull: ['$hostname', '$endpoint', '$endpoint_name', '$metadata.endpoint_name', '$metadata.hostname', '$raw_data.hostname', 'Unknown'] },
+        // Map src_ip/dst_ip from top level fields 
+        source_ip: { $ifNull: ['$source_ip', '$src_ip', '$ip_address', '$metadata.ip_address', '$raw_data.src_ip', 'N/A'] },
+        dest_ip: { $ifNull: ['$dest_ip', '$dst_ip', '$raw_data.dst_ip', 'N/A'] },
+        // Assign severity - default to Info for null values
+        severity: { $ifNull: ['$severity', 'Info'] },
+        protocol: { $ifNull: ['$protocol', '$raw_data.protocol', 'N/A'] },
+        src_port: { $ifNull: ['$src_port', '$raw_data.src_port', null] },
+        dst_port: { $ifNull: ['$dst_port', '$raw_data.dst_port', null] },
+        status: { $ifNull: ['$status', '$raw_data.status', 'N/A'] },
+        action: { $ifNull: ['$raw_data.status', '$status', '$parsed_data.event_action', 'N/A'] }
       }
     })
 
@@ -269,7 +283,9 @@ router.get('/', async (req, res) => {
         metadata: 1,
         geo: 1,
         protocol: 1,
-        port: 1,
+        src_port: 1,
+        dst_port: 1,
+        status: 1,
         action: 1,
         classification_version: 1,
         classified_at: 1

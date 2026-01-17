@@ -690,6 +690,13 @@ nav {
   padding: 0.125rem 0.5rem;
 }
 
+.badge-info {
+  border-radius: 9999px;
+  border: 1px solid #4a9eff;
+  padding: 0.125rem 0.5rem;
+  color: #4a9eff;
+}
+
 /* Toast container (already exists in App.vue, just recolor) */
 .fixed.bottom-4.right-4 .rounded-lg {
   background-color: var(--bg-card);
