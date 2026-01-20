@@ -623,7 +623,7 @@ import { useToast } from '../composables/useToast'
 import { formatTimestamp } from '../utils/timestampFormatter.js'
 import { normalizeSeverity, getSeverityClass, getSeverityLabel } from '../utils/severityNormalization'
 import { STANDARD_LOG_TYPES, getDisplayName } from '../utils/logTypeConstants'
-import { logsAPI } from '../api/logs'
+import { logsAPI, statsAPI } from '../api/logs'
 import axios from 'axios'
 
 const logStore = useLogStore()
@@ -643,17 +643,22 @@ const displayLimit = ref(20)
 const currentPage = ref(1)
 const hasMore = ref(true)
 const logs = ref([])
+const contextSeverityStats = ref([])
 
 onMounted(async () => {
   console.log('LogTypes component mounted')
-  await fetchLogs(true)
-  await apiStore.fetchDashboardStats()
+  await Promise.all([
+    fetchLogs(true),
+    fetchSeverityStats(),
+    apiStore.fetchDashboardStats()
+  ])
 })
 
 // Watch for filter changes and apply them
 watch([selectedLogType, filterSeverity, filterTimeRange, filterAction, filterSourceIP], () => {
   // Reset pagination on filter change
   fetchLogs(true)
+  fetchSeverityStats()
 })
 
 const fetchLogs = async (reset = false) => {
@@ -710,6 +715,29 @@ const fetchLogs = async (reset = false) => {
   } finally {
     isLoading.value = false
   }
+
+}
+
+const fetchSeverityStats = async () => {
+  try {
+    let internalLogType = null
+    if (selectedLogType.value !== 'All') {
+      internalLogType = STANDARD_LOG_TYPES.find(type => getDisplayName(type) === selectedLogType.value) || selectedLogType.value
+    }
+
+    const response = await statsAPI.getSeverityStats({
+       logType: internalLogType,
+       timeRange: filterTimeRange.value,
+       sourceIp: filterSourceIP.value || null,
+       severity: filterSeverity.value || null
+    })
+    
+    if (response && response.data) {
+        contextSeverityStats.value = response.data
+    }
+  } catch (error) {
+    console.error('Error fetching severity stats:', error)
+  }
 }
 
 const handleLogTypesSearch = () => {
@@ -731,13 +759,12 @@ const totalCount = ref(0) // Store total count from API
 // We no longer filter locally for the main list
 const filteredLogs = computed(() => logs.value)
 
-// Use apiStore.severityBreakdown for TOTAL severity counts to match LogViewer
-// This ensures consistency across all tabs
-const criticalCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'Critical')?.count || 0)
-const highCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'High')?.count || 0)
-const mediumCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'Medium')?.count || 0)
-const lowCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'Low')?.count || 0)
-const infoCount = computed(() => apiStore.severityBreakdown.find(s => s._id === 'Info')?.count || 0)
+// Use locally fetched context-aware stats
+const criticalCount = computed(() => contextSeverityStats.value.find(s => s._id === 'Critical')?.count || 0)
+const highCount = computed(() => contextSeverityStats.value.find(s => s._id === 'High')?.count || 0)
+const mediumCount = computed(() => contextSeverityStats.value.find(s => s._id === 'Medium')?.count || 0)
+const lowCount = computed(() => contextSeverityStats.value.find(s => s._id === 'Low')?.count || 0)
+const infoCount = computed(() => contextSeverityStats.value.find(s => s._id === 'Info')?.count || 0)
 
 // Use the total count from the API response for the main counter
 const totalFilteredCount = computed(() => totalCount.value)

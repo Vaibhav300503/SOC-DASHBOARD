@@ -154,6 +154,9 @@ router.get('/', async (req, res) => {
     const logType = req.query.logType
     const timeRange = req.query.timeRange || '24h'
     const action = req.query.action
+    const sourceIp = req.query.sourceIp
+    const destIp = req.query.destIp
+    const endpoint = req.query.endpoint
     const page = parseInt(req.query.page) || 1
     const skip = (page - 1) * limit
 
@@ -249,6 +252,9 @@ router.get('/', async (req, res) => {
     // Severity is handled in initial match for performance
     if (logType) matchConditions.log_type = logType
     if (action) matchConditions.action = action
+    if (sourceIp) matchConditions.source_ip = sourceIp
+    if (destIp) matchConditions.dest_ip = destIp
+    if (endpoint) matchConditions.endpoint = endpoint
 
     if (Object.keys(matchConditions).length > 0) {
       pipeline.push({ $match: matchConditions })

@@ -208,11 +208,18 @@ export const statsAPI = {
   /**
    * Get severity statistics
    */
-  async getSeverityStats(timeRange = '24h') {
+  async getSeverityStats(filters = '24h') {
     try {
-      const response = await axios.get(`${API_BASE}/stats/severity`, {
-        params: { timeRange }
-      })
+      const params = typeof filters === 'string'
+        ? { timeRange: filters }
+        : {
+          timeRange: filters.timeRange || '24h',
+          logType: filters.logType,
+          sourceIp: filters.sourceIp,
+          severity: filters.severity
+        }
+
+      const response = await axios.get(`${API_BASE}/stats/severity`, { params })
       return response.data
     } catch (error) {
       console.error('Error fetching severity stats:', error)

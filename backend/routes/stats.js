@@ -39,14 +39,16 @@ router.get('/dashboard', async (req, res) => {
 
     // Get total counts from all collections
     const [totalLogs, totalEvents, totalCases, totalAgents] = await Promise.all([
-      timeRange === 'all' ? Log.countDocuments({}) : Log.countDocuments({
-        $or: [
-          { timestamp: { $gte: since } },
-          { ingested_at: { $gte: since } },
-          { createdAt: { $gte: since } },
-          { created_at: { $gte: since } }
-        ]
-      }),
+      timeRange === 'all' ? Log.countDocuments({}) : Log.aggregate([
+        {
+          $addFields: {
+            // Use same normalization as other pipelines to ensure count consistency
+            normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] }
+          }
+        },
+        { $match: { normTimestamp: { $gte: since } } },
+        { $count: 'total' }
+      ]).then(res => res[0]?.total || 0),
       timeRange === 'all' ? Event.countDocuments({}) : Event.countDocuments({ '@timestamp': { $gte: since } }),
       timeRange === 'all' ? Case.countDocuments({}) : Case.countDocuments({ created_at: { $gte: since } }),
       Agent.countDocuments()
@@ -347,6 +349,9 @@ router.get('/dashboard', async (req, res) => {
 router.get('/severity', async (req, res) => {
   try {
     const timeRange = req.query.timeRange || '24h'
+    const logType = req.query.logType
+    const sourceIp = req.query.sourceIp
+    const severity = req.query.severity
     const hoursAgo = timeRange === '24h' ? 24 : timeRange === '7d' ? 168 : 720
 
     const pipeline = [
@@ -354,14 +359,65 @@ router.get('/severity', async (req, res) => {
         $addFields: {
           normTimestamp: { $ifNull: ['$timestamp', '$ingested_at', '$createdAt', '$created_at', new Date()] },
           // Assign severity based on stored field - default to Info
-          assignedSeverity: { $ifNull: ['$severity', 'Info'] }
+          assignedSeverity: { $ifNull: ['$severity', 'Info'] },
+          normLogType: {
+            $cond: {
+              if: { $ne: ['$log_type', null] },
+              then: '$log_type',
+              else: {
+                $switch: {
+                  branches: [
+                    // Network - check top level log_source first
+                    { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /network.*snapshot|network.*monitor|tailscale/i } }, then: 'Network' },
+                    // Authentication
+                    { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /unified.*auth|windows.*auth|authentication/i } }, then: 'Authentication' },
+                    // Firewall
+                    { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /firewall/i } }, then: 'Firewall' },
+                    // Application
+                    { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /application|nginx|apache|web.*api/i } }, then: 'Application' },
+                    // Database
+                    { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /database|sql|mysql|postgres|mongodb/i } }, then: 'Database' },
+                    // Registry
+                    { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /registry|reg|hkey/i } }, then: 'Registry' },
+                    // FIM
+                    { case: { $regexMatch: { input: { $ifNull: ['$log_source', ''] }, regex: /fim|file.*integrity/i } }, then: 'File Integrity' },
+                    // Fallback: Check metadata.log_source
+                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /network.*snapshot|network.*monitor|tailscale/i } }, then: 'Network' },
+                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /unified.*auth|windows.*auth|authentication/i } }, then: 'Authentication' },
+                    { case: { $regexMatch: { input: { $ifNull: ['$metadata.log_source', ''] }, regex: /firewall/i } }, then: 'Firewall' }
+                  ],
+                  default: 'System'
+                }
+              }
+            }
+          },
+          // Normalize source IP for filtering
+          normSourceIp: { $ifNull: ['$source_ip', '$ip_address', '$metadata.ip_address', '$raw_data.src_ip', 'Unknown'] }
         }
       }
     ]
 
+    const matchStage = {}
+
     if (timeRange !== 'all') {
       const since = new Date(Date.now() - hoursAgo * 60 * 60 * 1000)
-      pipeline.push({ $match: { normTimestamp: { $gte: since } } })
+      matchStage.normTimestamp = { $gte: since }
+    }
+
+    if (logType) {
+      matchStage.normLogType = logType
+    }
+
+    if (sourceIp) {
+      matchStage.normSourceIp = sourceIp
+    }
+
+    if (severity) {
+      matchStage.assignedSeverity = severity
+    }
+
+    if (Object.keys(matchStage).length > 0) {
+      pipeline.push({ $match: matchStage })
     }
 
     pipeline.push({
